@@ -31,6 +31,14 @@ describe('Disk II ROM and nibble read integration',()=>{
   d.access(0xc0e9);d.readNibble();d.access(0xc0e3);
   d.rewind(0);expect(d.track).toBe(0);expect(d.readNibble()).toBe(0xff);
  });
+ it('moves one track for every two adjacent phase advances',()=>{
+  const d=new DiskII();d.mount(0,new Uint8Array(143360));
+  d.access(0xc0e3);expect(d.track).toBe(0);
+  d.access(0xc0e5);expect(d.track).toBe(1);
+  d.access(0xc0e7);expect(d.track).toBe(1);
+  d.access(0xc0e1);expect(d.track).toBe(2);
+  d.rewind(0);expect(d.track).toBe(0);
+ });
  it('reads raw NIB track bytes without re-encoding',()=>{
   const d=new DiskII(),nib=new Uint8Array(232960);nib[0]=0xd5;nib[1]=0xaa;nib[6656]=0x96;
   d.mount(0,nib);expect(d.formats[0]).toBe('NIB');
