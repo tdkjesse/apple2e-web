@@ -9,6 +9,17 @@ const keyboard=document.querySelector<HTMLInputElement>('#keyboard')!;
 let romMode=false;
 let running=false;
 let lastError='';
+function bootSectorDiagnostic(){
+ const disk=bus.disk;
+ if(disk.formats[0]!=='DSK'||!disk.images[0])return '';
+ // Boot ROM normally loads physical track 0, sector 0 into $0800.
+ const expected=disk.images[0].subarray(0,256);
+ const actual=bus.ram.subarray(0x800,0x900);
+ let differences=0;
+ for(let i=0;i<256;i++)if(expected[i]!==actual[i])differences++;
+ const hex=(bytes:Uint8Array)=>Array.from(bytes.subarray(0,16),b=>b.toString(16).padStart(2,'0')).join(' ');
+ return ' | T0S0 mismatches '+differences+'/256 | image '+hex(expected)+' | RAM0800 '+hex(actual);
+}
 function stop(){running=false;}
 function frame(){
  if(!running)return;
@@ -16,7 +27,7 @@ function frame(){
  catch(e){
   const pc=(cpu.pc-1)&0xffff;
   const bytes=Array.from({length:16},(_,i)=>bus.read((pc-8+i)&0xffff).toString(16).padStart(2,'0')).join(' ');
-  lastError=String(e)+' | At $'+pc.toString(16).padStart(4,'0')+' nearby: '+bytes+' | S6 disk '+bus.disk.fingerprint(0)+' | S6 track '+bus.disk.track+' nibble '+bus.disk.readPosition+' latch $'+bus.disk.readLatch.toString(16).padStart(2,'0')+' motor '+(bus.disk.motor?'on':'off');
+  lastError=String(e)+' | At $'+pc.toString(16).padStart(4,'0')+' nearby: '+bytes+' | S6 disk '+bus.disk.fingerprint(0)+' | S6 track '+bus.disk.track+' nibble '+bus.disk.readPosition+' latch $'+bus.disk.readLatch.toString(16).padStart(2,'0')+' motor '+(bus.disk.motor?'on':'off')+bootSectorDiagnostic();
   running=false;draw();
  }
  if(running)requestAnimationFrame(frame);
