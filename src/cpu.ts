@@ -35,7 +35,7 @@ define('JSR',['abs'],[0x20],[6]);
 
 export class CPU6502 {
  readonly memory = new Uint8Array(65536);
- bus?: {read(address:number):number;write(address:number,value:number):void};
+ bus?: {read(address:number):number;write(address:number,value:number):void;tick?(cycles:number):void};
  a=0; x=0; y=0; pc=0; sp=0xfd; status=0x24; halted=false; cycles=0;
  demoStopOnBrk=false; // Only for the temporary browser demo; not authentic hardware.
  private irqPending=false; private nmiPending=false;
@@ -168,7 +168,7 @@ export class CPU6502 {
        if(f){const old=this.pc;this.pc=(this.pc+addr)&65535;extra+=1+((old&0xff00)!==(this.pc&0xff00)?1:0);}break;
      }
    }
-   const used=op.cycles+extra;this.cycles+=used;return used;
+   const used=op.cycles+extra;this.cycles+=used;this.bus?.tick?.(used);return used;
  }
  run(maxInstructions=10000){let n=0;while(!this.halted&&n<maxInstructions){this.step();n++;}return n;}
 }
