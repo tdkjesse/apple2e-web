@@ -11,6 +11,8 @@ const status=document.querySelector<HTMLElement>('#status')!;
 const keyboard=document.querySelector<HTMLInputElement>('#keyboard')!;
 const speedSlider=document.querySelector<HTMLInputElement>('#speed')!;
 const speedValue=document.querySelector<HTMLOutputElement>('#speed-value')!;
+const syncTimingToggle=document.querySelector<HTMLInputElement>('#sync-timing')!;
+syncTimingToggle.addEventListener('change',()=>{bus.disk.syncTiming=syncTimingToggle.checked;bus.disk5.syncTiming=syncTimingToggle.checked;});
 const soundToggle=document.querySelector<HTMLButtonElement>('#sound-toggle')!;
 const volumeSlider=document.querySelector<HTMLInputElement>('#volume')!;
 const volumeValue=document.querySelector<HTMLOutputElement>('#volume-value')!;
