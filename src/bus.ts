@@ -2,7 +2,8 @@
 export class AppleIIeBus {
  readonly ram=new Uint8Array(65536);
  readonly aux=new Uint8Array(65536);
- readonly rom=new Uint8Array(0x3000);
+ readonly rom=new Uint8Array(0x4000);
+ romStart=0xd000;
  private readonly lcMain=new Uint8Array(0x4000);
  private readonly lcAux=new Uint8Array(0x4000);
  romLoaded=false; keyboard=0;
@@ -16,8 +17,9 @@ export class AppleIIeBus {
   this.lcRead=this.lcWrite=false;this.lcBank2=true;this.lcPrewrite=false;
  }
  loadROM(data:Uint8Array){
-  if(data.length!==0x3000)throw new Error('Expected 12 KiB ($D000-$FFFF) ROM image');
-  this.rom.set(data);this.romLoaded=true;
+  if(data.length!==0x3000&&data.length!==0x4000)throw new Error('Expected 12 KiB or 16 KiB Apple IIe ROM image');
+  this.rom.fill(0);this.romStart=data.length===0x4000?0xc000:0xd000;
+  this.rom.set(data,this.romStart-0xc000);this.romLoaded=true;
  }
  key(code:number){this.keyboard=(code&127)|128;}
  private bank(a:number,write:boolean):Uint8Array{
@@ -73,9 +75,14 @@ export class AppleIIeBus {
   if(Object.prototype.hasOwnProperty.call(statuses,a))return statuses[a]?128:0;
   if(a>=0xd000){
    if(this.lcRead)return this.lcArray()[this.lcOffset(a)];
-   return this.romLoaded?this.rom[a-0xd000]:this.ram[a];
+   return this.romLoaded?this.rom[a-0xc000]:this.ram[a];
   }
-  if(a>=0xc000)return 0; // Slot I/O and Cx ROM are not implemented yet.
+  if(a>=0xc100&&a<=0xcfff&&this.romLoaded&&this.romStart===0xc000){
+   // Internal Cx ROM is selected when INTCXROM is on; C3 also uses internal ROM
+   // unless SLOTC3ROM is enabled. External slot ROMs are not emulated yet.
+   if(this.intcxrom||(a>=0xc300&&a<0xc400&&!this.slotc3rom))return this.rom[a-0xc000];
+  }
+  if(a>=0xc000)return 0; // Remaining slot I/O / external slot ROM not implemented.
   return this.bank(a,false)[a];
  }
  write(address:number,value:number){
