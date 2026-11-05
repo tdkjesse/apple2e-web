@@ -7,6 +7,13 @@ const canvas=document.querySelector<HTMLCanvasElement>('#screen')!;
 const ctx=canvas.getContext('2d')!;
 const status=document.querySelector<HTMLElement>('#status')!;
 const keyboard=document.querySelector<HTMLInputElement>('#keyboard')!;
+const speedSlider=document.querySelector<HTMLInputElement>('#speed')!;
+const speedValue=document.querySelector<HTMLOutputElement>('#speed-value')!;
+let speedMultiplier=1;
+speedSlider.addEventListener('input',()=>{
+ speedMultiplier=Math.max(1,Math.min(8,Number(speedSlider.value)||1));
+ speedValue.textContent=speedMultiplier+'×';
+});
 let romMode=false;
 let running=false;
 let lastError='';
@@ -127,7 +134,7 @@ function traceDiagnostic(){
 }
 function frame(){
  if(!running)return;
- try {for(let i=0;i<12000&&!cpu.halted;i++)traceStep();draw();if(cpu.halted)running=false;}
+ try {for(let i=0;i<12000*speedMultiplier&&!cpu.halted;i++)traceStep();draw();if(cpu.halted)running=false;}
  catch(e){
   const pc=(cpu.pc-1)&0xffff;
   const bytes=Array.from({length:16},(_,i)=>bus.read((pc-8+i)&0xffff).toString(16).padStart(2,'0')).join(' ');
@@ -166,7 +173,7 @@ function draw(){
    ctx.fillText(ch,x,y);
   }
  }
- status.textContent='PC: $'+cpu.pc.toString(16).padStart(4,'0')+' A: $'+cpu.a.toString(16).padStart(2,'0')+' | '+(romMode?'ROM':'DEMO')+' | '+(running?'RUNNING':cpu.halted?'HALTED':'PAUSED')+' | '+columns+' COL'+' | S6: '+(bus.disk.formats[0]??'-')+' T'+bus.disk.track+' N'+bus.disk.readPosition+' L$'+bus.disk.readLatch.toString(16).padStart(2,'0')+' | Drives: '+[6,5].flatMap(slot=>bus.diskControllers[slot].mountedDrives.map((mounted,i)=>'S'+slot+'D'+(i+1)+':'+(mounted?'M':'-'))).join(' ')+(lastError?' | '+lastError:'')+(romMode&&!lastError?traceDiagnostic():'');
+ status.textContent='PC: $'+cpu.pc.toString(16).padStart(4,'0')+' A: $'+cpu.a.toString(16).padStart(2,'0')+' | '+(romMode?'ROM':'DEMO')+' | '+(running?'RUNNING':cpu.halted?'HALTED':'PAUSED')+' | '+columns+' COL'+' | speed '+speedMultiplier+'x'+' | S6: '+(bus.disk.formats[0]??'-')+' T'+bus.disk.track+' N'+bus.disk.readPosition+' L$'+bus.disk.readLatch.toString(16).padStart(2,'0')+' | Drives: '+[6,5].flatMap(slot=>bus.diskControllers[slot].mountedDrives.map((mounted,i)=>'S'+slot+'D'+(i+1)+':'+(mounted?'M':'-'))).join(' ')+(lastError?' | '+lastError:'')+(romMode&&!lastError?traceDiagnostic():'');
 }
 document.querySelector('#reset')!.addEventListener('click',()=>{stop();lastError='';if(romMode){bus.reset();cpu.reset();draw();}else loadDemo();});
 document.querySelector('#boot-disk')!.addEventListener('click',()=>{
