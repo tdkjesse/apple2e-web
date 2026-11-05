@@ -16,7 +16,7 @@ export class DiskII {
   for(const byte of image){hash=Math.imul(hash^byte,16777619)>>>0;}
   return hash.toString(16).padStart(8,'0');
  }
- rewind(drive:number){if(drive!==0&&drive!==1)throw new RangeError('Drive must be 0 or 1');this.positions[drive]=0;this.cycleRemainder=0;this.latch=0;this.dataReady=false;this.tracks[drive]=0;this.phasesByDrive[drive]=0;this.halfTracks[drive]=0;this.coils[drive].fill(false);if(this.drive===drive)this.syncDrive();}
+ rewind(drive:number){if(drive!==0&&drive!==1)throw new RangeError('Drive must be 0 or 1');this.positions[drive]=0;this.cycleRemainder=0;this.nextNibbleCycles=32;this.latch=0;this.dataReady=false;this.tracks[drive]=0;this.phasesByDrive[drive]=0;this.halfTracks[drive]=0;this.coils[drive].fill(false);if(this.drive===drive)this.syncDrive();}
 
  private q6=false;
  private q7=false;
@@ -72,12 +72,16 @@ export class DiskII {
   }
  }
  private cycleRemainder=0;
+ // Apple II sync $FF bytes contain extra zero bit cells; allow comparison with legacy fixed timing.
+ syncTiming=true;
+ private nextNibbleCycles=32;
  // Disk II nominal byte rate is about one byte per 32 1 MHz CPU cycles.
  tick(cycles:number){
   if(!this.motor||!this.mountedDrives[this.drive]||this.q7)return;
   this.cycleRemainder+=cycles;
-  while(this.cycleRemainder>=32){this.cycleRemainder-=32;if(this.dataReady)this.readStats.overwritten++;
-   this.latch=this.readNibble();this.dataReady=true;this.readStats.produced++;}
+  while(this.cycleRemainder>=this.nextNibbleCycles){this.cycleRemainder-=this.nextNibbleCycles;if(this.dataReady)this.readStats.overwritten++;
+   this.latch=this.readNibble();this.dataReady=true;this.readStats.produced++;
+   this.nextNibbleCycles=this.syncTiming&&this.latch===0xff?40:32;}
  }
 
  readonly bootROM=new Uint8Array(256);
@@ -104,7 +108,7 @@ export class DiskII {
   if(data.length!==143360&&data.length!==232960)throw new Error('Expected 143360-byte .dsk or 232960-byte .nib image');
   this.formats[drive]=data.length===232960?'NIB':'DSK';
   this.rawNibble[drive]=data.length===232960?Array.from({length:35},(_,t)=>new Uint8Array(data.slice(t*6656,(t+1)*6656))):null;
-  this.images[drive]=new Uint8Array(data);this.nibbleTracks[drive].fill(null);this.positions[drive]=0;this.cycleRemainder=0;this.latch=0;this.tracks[drive]=0;this.phasesByDrive[drive]=0;this.halfTracks[drive]=0;
+  this.images[drive]=new Uint8Array(data);this.nibbleTracks[drive].fill(null);this.positions[drive]=0;this.cycleRemainder=0;this.nextNibbleCycles=32;this.latch=0;this.tracks[drive]=0;this.phasesByDrive[drive]=0;this.halfTracks[drive]=0;
   this.coils[drive].fill(false);if(drive===this.drive)this.syncDrive();
  }
  private syncDrive(){this.image=this.images[this.drive];this.track=this.tracks[this.drive];this.phase=this.phasesByDrive[this.drive];}
