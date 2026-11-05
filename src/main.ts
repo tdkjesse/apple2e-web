@@ -8,7 +8,7 @@ const status=document.querySelector<HTMLElement>('#status')!;
 const keyboard=document.querySelector<HTMLInputElement>('#keyboard')!;
 let romMode=false;
 function loadDemo(){
- romMode=false;cpu.demoStopOnBrk=true;bus.ram.fill(0);bus.reset();
+ romMode=false;cpu.demoStopOnBrk=true;bus.ram.fill(0);bus.aux.fill(0);bus.reset();
  const message='HELLO, APPLE II!';
  const program:number[]=[];
  for(let i=0;i<message.length;i++){const a=0x400+i;program.push(0xa9,message.charCodeAt(i)|128,0x8d,a&255,a>>8);}
@@ -22,8 +22,8 @@ function draw(){
   if(!bus.text&&row<20)continue;
   let line='';
   for(let col=0;col<40;col++){
-   const addr=(bus.page2?0x800:0x400)+((row&7)<<7)+Math.floor(row/8)*40+col;
-   const b=bus.read(addr);line+=b>=0xa0?String.fromCharCode(b&0x7f):' ';
+   const addr=(bus.store80?0x400:(bus.page2?0x800:0x400))+((row&7)<<7)+Math.floor(row/8)*40+col;
+   const b=bus.videoRead(addr);line+=b>=0xa0?String.fromCharCode(b&0x7f):' ';
   }
   ctx.fillText(line,8,row*16);
  }
