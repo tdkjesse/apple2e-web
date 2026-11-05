@@ -58,6 +58,15 @@ const loaderExits=new Map<string,number>();
 const extendedVisits=new Map<number,number>();
 const extendedBranches=new Map<number,{taken:number;notTaken:number;target:number}>();
 const loaderRecent:string[]=[];
+const decisionSamples=new Map<number,{taken:string[];notTaken:string[]}>();
+const decisionPCs=new Set([0xbe1c,0xbe20,0xbe24,0xbe30,0xbe33,0xbe39,0xbd49,0xbd4c]);
+function loaderDecisionDiagnostic(){
+ const hex=(n:number)=>n.toString(16).padStart(2,'0');
+ const code=[0xbe10,0xbe1c,0xbe26,0xbe30,0xbe33,0xbe39,0xbdc9].map(pc=>hex16(pc)+':'+Array.from({length:12},(_,i)=>hex(bus.read(pc+i))).join(' '));
+ const samples=[...decisionSamples].map(([pc,v])=>hex16(pc)+' T['+v.taken.join(';')+'] N['+v.notTaken.join(';')+']');
+ return ' | loader code '+code.join(' / ')+' | decisions '+samples.join(' / ');
+}
+
 function loaderBranchDiagnostic(){
  const branches=[...loaderBranches.entries()].sort((a,b)=>(b[1].taken+b[1].notTaken)-(a[1].taken+a[1].notTaken)).slice(0,12);
  const extended=[...extendedVisits.entries()].sort((a,b)=>b[1]-a[1]).slice(0,10);
@@ -68,7 +77,7 @@ function loaderBranchDiagnostic(){
   ' | BE-BF hot '+extended.map(([pc,n])=>hex16(pc)+':'+n).join(',')+
   ' | BE-BF branches '+extendedB.map(([pc,v])=>hex16(pc)+'>'+hex16(v.target)+':'+v.taken+'/'+v.notTaken).join(',')+
   ' | ZP46/47 '+bus.ram[0x46]+'/'+bus.ram[0x47]+
-  ' | loader recent ['+loaderRecent.join(',')+']';
+  ' | loader recent ['+loaderRecent.join(',')+']'+loaderDecisionDiagnostic();
 }
 function traceStep(){
  if(!running)sectorScanCache='';
@@ -77,6 +86,7 @@ function traceStep(){
  const traceExtended=romMode&&before>=0xbe00&&before<0xc000;
  const opcode=traceLoader||traceExtended?bus.read(before):0;
  const branch=(traceLoader||traceExtended)&&[0x10,0x30,0x50,0x70,0x90,0xb0,0xd0,0xf0].includes(opcode);
+ const decision=branch&&decisionPCs.has(before)?'A'+cpu.a.toString(16)+' X'+cpu.x.toString(16)+' Y'+cpu.y.toString(16)+' P'+cpu.status.toString(16)+' Z46'+bus.ram[0x46].toString(16)+' Z47'+bus.ram[0x47].toString(16):'';
  const target=branch?(before+2+((bus.ram[(before+1)&65535]<<24)>>24))&65535:0;
  if(romMode){
   pcVisits[before]++;instructionCount++;
@@ -89,6 +99,10 @@ function traceStep(){
   }
  }
  cpu.step();
+ if(branch&&decision){let rec=decisionSamples.get(before);if(!rec){rec={taken:[],notTaken:[]};decisionSamples.set(before,rec);}
+  const samples=cpu.pc===target?rec.taken:rec.notTaken;
+  if(samples.length<4)samples.push(decision);
+ }
  if(traceExtended){
   extendedVisits.set(before,(extendedVisits.get(before)||0)+1);
   if(branch){let rec=extendedBranches.get(before);
