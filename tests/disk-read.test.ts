@@ -12,8 +12,17 @@ describe('Disk II ROM and nibble read integration',()=>{
  });
  it('reads the Q6-low read latch',()=>{
   const d=new DiskII();d.mount(0,new Uint8Array(143360));
-  d.access(0xc0e9);expect(d.access(0xc0ec)).toBe(0xff);
+  d.access(0xc0e9);expect(d.access(0xc0ec)).toBe(0);
+  d.tick(31);expect(d.access(0xc0ec)).toBe(0);
+  d.tick(1);expect(d.access(0xc0ec)).toBe(0xff);
   expect(d.access(0xc0ec)).toBe(0xff);
+ });
+ it('advances one nibble per 32 CPU cycles without consuming on repeated polls',()=>{
+  const d=new DiskII();d.mount(0,new Uint8Array(143360));d.access(0xc0e9);
+  d.tick(32*16);expect(d.access(0xc0ec)).toBe(0xff);
+  d.tick(32);expect(d.access(0xc0ec)).toBe(0xd5);
+  expect(d.access(0xc0ec)).toBe(0xd5);
+  d.access(0xc0e8);d.tick(320);expect(d.access(0xc0ec)).toBe(0);
  });
  it('distinguishes disk contents and resets head position for a fresh boot',()=>{
   const d=new DiskII();const a=new Uint8Array(143360),b=new Uint8Array(143360);
