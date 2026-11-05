@@ -25,12 +25,13 @@ define('DEC',['zp','zpx','abs','abx'],[0xc6,0xd6,0xce,0xde],[5,6,6,7]);
 for(const [name,code] of [['BPL',0x10],['BMI',0x30],['BVC',0x50],['BVS',0x70],['BCC',0x90],['BCS',0xb0],['BNE',0xd0],['BEQ',0xf0]] as const)
  define(name,['rel'],[code],[2]);
 for(const [name,code,cycles] of [
- ['BRK',0x00,7],['PHP',0x08,3],['CLC',0x18,2],['JSR',0x20,6],['PLP',0x28,4],['SEC',0x38,2],
+ ['BRK',0x00,7],['PHP',0x08,3],['CLC',0x18,2],['PLP',0x28,4],['SEC',0x38,2],
  ['RTI',0x40,6],['PHA',0x48,3],['CLI',0x58,2],['RTS',0x60,6],['PLA',0x68,4],['SEI',0x78,2],
  ['DEY',0x88,2],['TXA',0x8a,2],['TYA',0x98,2],['TXS',0x9a,2],['TAY',0xa8,2],['TAX',0xaa,2],
  ['CLV',0xb8,2],['TSX',0xba,2],['INY',0xc8,2],['DEX',0xca,2],['CLD',0xd8,2],['INX',0xe8,2],
  ['NOP',0xea,2],['SED',0xf8,2]] as const) define(name,['imp'],[code],[cycles]);
 define('JMP',['abs','ind'],[0x4c,0x6c],[3,5]);
+define('JSR',['abs'],[0x20],[6]);
 
 export class CPU6502 {
  readonly memory = new Uint8Array(65536);
