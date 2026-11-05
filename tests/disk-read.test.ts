@@ -15,6 +15,13 @@ describe('Disk II ROM and nibble read integration',()=>{
   d.access(0xc0e9);expect(d.access(0xc0ec)).toBe(0xff);
   expect(d.access(0xc0ec)).toBe(0xff);
  });
+ it('distinguishes disk contents and resets head position for a fresh boot',()=>{
+  const d=new DiskII();const a=new Uint8Array(143360),b=new Uint8Array(143360);
+  b[0]=1;d.mount(0,a);const first=d.fingerprint(0);
+  d.mount(0,b);expect(d.fingerprint(0)).not.toBe(first);
+  d.access(0xc0e9);d.readNibble();d.access(0xc0e3);
+  d.rewind(0);expect(d.track).toBe(0);expect(d.readNibble()).toBe(0xff);
+ });
  it('validates boot ROM size and maps slots independently',()=>{
   const b=new AppleIIeBus();
   expect(()=>b.disk.loadBootROM(new Uint8Array(255))).toThrow();
