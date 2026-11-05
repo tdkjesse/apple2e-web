@@ -48,6 +48,16 @@ describe('Disk II DOS 3.3 nibblization',()=>{
    expect(result).toEqual(source);
   }
  });
+ it('matches historical PRENIBL16 low-bit placement for isolated source bits',()=>{
+  // Each input starts with an otherwise zero-filled sector. The final
+  // auxiliary nibble is written at encoded offset 85 (reverse aux order).
+  const cases:[number,number][]=[[0,0x9a],[86,0xa7],[172,0xd6]];
+  for(const [offset,expected] of cases){
+   const sector=new Uint8Array(256);sector[offset]=1;
+   const encoded=encodeSector62(sector);
+   expect(encoded[85]).toBe(expected);
+  }
+ });
  it('rejects incorrect sector and track lengths',()=>{
   expect(()=>encodeSector62(new Uint8Array(255))).toThrow();
   expect(()=>encodeTrack(new Uint8Array(100),0)).toThrow();
