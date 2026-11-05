@@ -136,7 +136,7 @@ export class CPU6502 {
      }
      case 'INC':case 'DEC':{const n=(v()+(op.name==='INC'?1:-1))&255;this.write(addr,n);this.zn(n);break;}
      case 'JMP':this.pc=addr;break;
-     case 'JSR':{const ret=(this.pc-1)&65535;this.push(ret>>8);this.push(ret&255);this.pc=addr;break;}
+     case 'JSR':{const target=this.word();const ret=(this.pc-1)&65535;this.push(ret>>8);this.push(ret&255);this.pc=target;break;}
      case 'RTS':this.pc=((this.pop()|(this.pop()<<8))+1)&65535;break;
      case 'BRK':if(this.demoStopOnBrk){this.halted=true;break;}this.pc=(this.pc+1)&65535;this.interrupt(0xfffe,true);this.cycles-=7;break;
      case 'RTI':this.status=(this.pop()|0x20)&~0x10;this.pc=this.pop()|(this.pop()<<8);break;
