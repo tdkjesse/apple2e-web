@@ -64,6 +64,11 @@ document.querySelectorAll<HTMLInputElement>('.disk-image').forEach(input=>input.
  try{const slot=Number(input.dataset.slot),drive=Number(input.dataset.drive);bus.diskControllers[slot].mount(drive,new Uint8Array(await file.arrayBuffer()));lastError='';draw();}
  catch(e){lastError=String(e);draw();}
 }));
+document.querySelectorAll<HTMLInputElement>('.disk-rom').forEach(input=>input.addEventListener('change',async event=>{
+ const file=(event.target as HTMLInputElement).files?.[0];if(!file)return;
+ try{bus.diskControllers[Number(input.dataset.slot)].loadBootROM(new Uint8Array(await file.arrayBuffer()));lastError='';draw();}
+ catch(e){lastError=String(e);draw();}
+}));
 keyboard.addEventListener('keydown',e=>{
  let code=0;
  if(e.key==='Enter')code=13;
