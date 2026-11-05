@@ -49,6 +49,15 @@ function draw(){
  status.textContent='PC: $'+cpu.pc.toString(16).padStart(4,'0')+' A: $'+cpu.a.toString(16).padStart(2,'0')+' | '+(romMode?'ROM':'DEMO')+' | '+(running?'RUNNING':cpu.halted?'HALTED':'PAUSED')+' | '+columns+' COL'+' | Drives: '+[6,5].flatMap(slot=>bus.diskControllers[slot].mountedDrives.map((mounted,i)=>'S'+slot+'D'+(i+1)+':'+(mounted?'M':'-'))).join(' ')+(lastError?' | '+lastError:'');
 }
 document.querySelector('#reset')!.addEventListener('click',()=>{stop();lastError='';if(romMode){bus.reset();cpu.reset();draw();}else loadDemo();});
+document.querySelector('#boot-disk')!.addEventListener('click',()=>{
+ stop();lastError='';
+ if(!bus.romLoaded){lastError='Load the Apple IIe system ROM first';draw();return;}
+ if(!bus.disk.bootROMLoaded){lastError='Load the 256-byte slot 6 Disk II boot ROM first';draw();return;}
+ if(!bus.disk.images[0]){lastError='Mount a disk in Slot 6 Drive 1 first';draw();return;}
+ bus.reset();bus.disk.access(0xc0ea);bus.ram.fill(0);bus.aux.fill(0);
+ romMode=true;cpu.demoStopOnBrk=false;cpu.reset(0xc600);
+ running=true;frame();
+});
 document.querySelector('#step')!.addEventListener('click',()=>{stop();try{cpu.step();draw();}catch(e){status.textContent=String(e);}});
 document.querySelector('#run')!.addEventListener('click',()=>{if(running){stop();draw();}else{running=true;frame();}});
 document.querySelector('#rom')!.addEventListener('change',async event=>{
