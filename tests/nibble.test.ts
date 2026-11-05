@@ -40,7 +40,7 @@ describe('Disk II DOS 3.3 nibblization',()=>{
    const result=new Uint8Array(256);
    for(let i=0;i<256;i++)result[i]=decoded[86+i]<<2;
    for(let i=0;i<86;i++){
-    const aux=decoded[85-i];
+    const aux=decoded[i];
     result[i]|=swap[aux&3];
     if(i+86<256)result[i+86]|=swap[(aux>>2)&3];
     if(i+172<256)result[i+172]|=swap[(aux>>4)&3];
@@ -55,7 +55,7 @@ describe('Disk II DOS 3.3 nibblization',()=>{
   for(const [offset,expected] of cases){
    const sector=new Uint8Array(256);sector[offset]=1;
    const encoded=encodeSector62(sector);
-   expect(encoded[85]).toBe(expected);
+   expect(encoded[0]).toBe(expected);
   }
  });
  it('rejects incorrect sector and track lengths',()=>{
