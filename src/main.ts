@@ -75,6 +75,13 @@ function diskReadDiagnostic(){
  const d=bus.disk.readStats;
  return ' | Disk reads ready '+d.ready+' wait '+d.waiting+' overwritten '+d.overwritten+' produced '+d.produced;
 }
+function cpuDiskDiagnostic(){
+ const p=bus.disk.cpuReadProbe;
+ return ' | CPU disk bytes '+p.total+' ready '+p.ready+' wait '+p.waiting+
+  ' high '+p.highBit+' zero '+p.zero+
+  ' address marks '+p.prologues+' data marks '+p.dataPrologues+
+  ' recent ['+p.last.join(' ')+']';
+}
 function sectorHeaderDiagnostic(){
  const p=bus.disk.sectorProbe;
  return ' | sector probe T'+p.track+' headers '+p.addresses+' data '+p.dataMarks+
@@ -148,7 +155,7 @@ function textPageDiagnostic(){
 function traceDiagnostic(){
  return ' | boot $0800 '+(reachedBootSector?'YES':'NO')+
   ' | firmware return '+(returnedToFirmware?firmwareReturn:'NO')+
-  ' | recent PCs '+bootTrace.map(hex16).join(' ')+cpuContext()+diskReadDiagnostic()+loaderDiagnostic()+sectorHeaderDiagnostic()+bootSectorDiagnostic()+sectorScanDiagnostic()+textPageDiagnostic();
+  ' | recent PCs '+bootTrace.map(hex16).join(' ')+cpuContext()+diskReadDiagnostic()+loaderDiagnostic()+cpuDiskDiagnostic()+sectorHeaderDiagnostic()+bootSectorDiagnostic()+sectorScanDiagnostic()+textPageDiagnostic();
 }
 function frame(){
  if(!running)return;
