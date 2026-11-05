@@ -5,6 +5,8 @@ export class AppleSpeaker {
  private nextTime=0;
  private lastCycle=0;
  private level=0;
+ private highPass=0;
+ private previousSample=0;
  private readonly bus:AppleIIeBus;
  enabled=false;
  volume=0.2;
@@ -24,6 +26,8 @@ export class AppleSpeaker {
   if(this.nextTime<ctx.currentTime)this.nextTime=ctx.currentTime;
   // Drop excessive buffered audio rather than introducing multi-second latency.
   if(this.nextTime>ctx.currentTime+0.35){this.lastCycle=end;this.level=this.bus.speakerLevel;return;}
+  // No speaker transitions means silence, not a continuous DC voltage.
+  if(edges.length===0){this.lastCycle=end;this.level=this.bus.speakerLevel;this.nextTime=ctx.currentTime;this.highPass=0;this.previousSample=0;return;}
   const duration=Math.max(0,(end-this.lastCycle)/(CPU_HZ*speed));
   const count=Math.min(65536,Math.floor(duration*ctx.sampleRate));
   if(count<1){this.lastCycle=end;this.level=this.bus.speakerLevel;return;}
@@ -33,7 +37,12 @@ export class AppleSpeaker {
   for(let i=0;i<count;i++){
    const cycle=this.lastCycle+(i+0.5)*CPU_HZ*speed/ctx.sampleRate;
    while(index<edges.length&&edges[index]<=cycle){level^=1;index++;}
-   samples[i]=(level?1:-1)*this.volume;
+   const raw=(level?1:-1)*this.volume;
+   // DC-blocking high-pass filter prevents clicks from a held speaker level.
+   this.highPass=0.995*(this.highPass+raw-this.previousSample);
+   this.previousSample=raw;
+   const fade=Math.min(1,i/64,(count-1-i)/64);
+   samples[i]=this.highPass*Math.max(0,fade);
   }
   const source=ctx.createBufferSource();source.buffer=buffer;source.connect(ctx.destination);
   source.start(this.nextTime);this.nextTime+=count/ctx.sampleRate;
