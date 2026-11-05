@@ -1,46 +1,99 @@
-// First-stage Apple IIe bus: main RAM, read-only system ROM, keyboard latch,
-// and basic text/graphics soft switches. Auxiliary banking and slot I/O follow later.
+// Apple IIe main/auxiliary memory and language-card model (initial implementation).
 export class AppleIIeBus {
  readonly ram=new Uint8Array(65536);
+ readonly aux=new Uint8Array(65536);
  readonly rom=new Uint8Array(0x3000);
- romLoaded=false;
- keyboard=0;
- text=true; mixed=false; page2=false; hires=false; col80=false;
- reset(){this.keyboard=0;this.text=true;this.mixed=false;this.page2=false;this.hires=false;this.col80=false;}
- loadROM(data:Uint8Array){
-   if(data.length!==0x3000)throw new Error('Expected 12 KiB ($D000-$FFFF) ROM image');
-   this.rom.set(data);this.romLoaded=true;
+ private readonly lcMain=new Uint8Array(0x4000);
+ private readonly lcAux=new Uint8Array(0x4000);
+ romLoaded=false; keyboard=0;
+ text=true;mixed=false;page2=false;hires=false;col80=false;
+ store80=false;ramrd=false;ramwrt=false;altzp=false;intcxrom=false;slotc3rom=false;
+ lcRead=false;lcWrite=false;lcBank2=true;
+ private lcPrewrite=false;
+ reset(){
+  this.keyboard=0;this.text=true;this.mixed=false;this.page2=false;this.hires=false;this.col80=false;
+  this.store80=this.ramrd=this.ramwrt=this.altzp=this.intcxrom=this.slotc3rom=false;
+  this.lcRead=this.lcWrite=false;this.lcBank2=true;this.lcPrewrite=false;
  }
- key(code:number){this.keyboard=(code&0x7f)|0x80;}
- read(address:number):number {
-   const a=address&65535;
-   if(a===0xc000)return this.keyboard;
-   if(a===0xc010){const k=this.keyboard;this.keyboard&=0x7f;return k;}
-   if(a>=0xc050&&a<=0xc057){this.switch(a);return 0;}
-   if(a===0xc01a)return this.text?0x80:0;
-   if(a===0xc01b)return this.mixed?0x80:0;
-   if(a===0xc01c)return this.page2?0x80:0;
-   if(a===0xc01d)return this.hires?0x80:0;
-   if(a===0xc01f)return this.col80?0x80:0;
-   if(a>=0xd000&&this.romLoaded)return this.rom[a-0xd000];
-   return this.ram[a];
+ loadROM(data:Uint8Array){
+  if(data.length!==0x3000)throw new Error('Expected 12 KiB ($D000-$FFFF) ROM image');
+  this.rom.set(data);this.romLoaded=true;
+ }
+ key(code:number){this.keyboard=(code&127)|128;}
+ private bank(a:number,write:boolean):Uint8Array{
+  if(a<0x200)return this.altzp?this.aux:this.ram;
+  if(this.store80&&((a>=0x400&&a<0x800)||(this.hires&&a>=0x2000&&a<0x4000)))
+   return this.page2?this.aux:this.ram;
+  return (write?this.ramwrt:this.ramrd)?this.aux:this.ram;
+ }
+ private lcArray(){return this.altzp?this.lcAux:this.lcMain;}
+ private lcOffset(a:number){return a<0xe000?(this.lcBank2?0:0x1000)+(a-0xd000):0x2000+(a-0xe000);}
+ private languageSwitch(a:number){
+  const mode=a&3;
+  this.lcBank2=(a&8)===0;
+  this.lcRead=mode===0||mode===3;
+  if((a&1)===0){this.lcWrite=false;this.lcPrewrite=false;}
+  else{
+   if(this.lcPrewrite)this.lcWrite=true;
+   this.lcPrewrite=true;
+  }
+ }
+ private softSwitch(a:number){
+  switch(a){
+   case 0xc050:this.text=false;break;case 0xc051:this.text=true;break;
+   case 0xc052:this.mixed=false;break;case 0xc053:this.mixed=true;break;
+   case 0xc054:this.page2=false;break;case 0xc055:this.page2=true;break;
+   case 0xc056:this.hires=false;break;case 0xc057:this.hires=true;break;
+  }
+ }
+ private setMemorySwitch(a:number){
+  const on=!!(a&1);
+  switch(a&0xfffe){
+   case 0xc000:this.store80=on;break;
+   case 0xc002:this.ramrd=on;break;
+   case 0xc004:this.ramwrt=on;break;
+   case 0xc006:this.intcxrom=on;break;
+   case 0xc008:this.altzp=on;break;
+   case 0xc00a:this.slotc3rom=on;break;
+   case 0xc00c:this.col80=on;break;
+  }
+ }
+ read(address:number):number{
+  const a=address&65535;
+  if(a===0xc000)return this.keyboard;
+  if(a===0xc010){const v=this.keyboard;this.keyboard&=127;return v;}
+  if(a>=0xc080&&a<=0xc08f){this.languageSwitch(a);return 0;}
+  if(a>=0xc050&&a<=0xc057){this.softSwitch(a);return 0;}
+  const statuses:Record<number,boolean>={
+   0xc011:this.lcBank2,0xc012:this.lcRead,0xc013:this.ramrd,0xc014:this.ramwrt,
+   0xc015:this.intcxrom,0xc016:this.altzp,0xc017:this.slotc3rom,
+   0xc018:this.store80,0xc01a:this.text,0xc01b:this.mixed,0xc01c:this.page2,
+   0xc01d:this.hires,0xc01f:this.col80
+  };
+  if(Object.prototype.hasOwnProperty.call(statuses,a))return statuses[a]?128:0;
+  if(a>=0xd000){
+   if(this.lcRead)return this.lcArray()[this.lcOffset(a)];
+   return this.romLoaded?this.rom[a-0xd000]:this.ram[a];
+  }
+  if(a>=0xc000)return 0; // Slot I/O and Cx ROM are not implemented yet.
+  return this.bank(a,false)[a];
  }
  write(address:number,value:number){
-   const a=address&65535;
-   if(a>=0xc050&&a<=0xc057){this.switch(a);return;}
-   if(a===0xc00c){this.col80=false;return;}
-   if(a===0xc00d){this.col80=true;return;}
-   if(a===0xc010){this.keyboard&=0x7f;return;}
-   if(a>=0xc000&&a<0xd000)return;
-   if(a>=0xd000&&this.romLoaded)return;
-   this.ram[a]=value&255;
+  const a=address&65535,v=value&255;
+  if(a>=0xc080&&a<=0xc08f){this.languageSwitch(a);return;}
+  if(a>=0xc050&&a<=0xc057){this.softSwitch(a);return;}
+  if(a===0xc010){this.keyboard&=127;return;}
+  if(a>=0xc000&&a<=0xc00f){this.setMemorySwitch(a);return;}
+  if(a>=0xd000){if(this.lcWrite)this.lcArray()[this.lcOffset(a)]=v;return;}
+  if(a>=0xc000)return;
+  this.bank(a,true)[a]=v;
  }
- private switch(a:number){
-   switch(a){
-     case 0xc050:this.text=false;break;case 0xc051:this.text=true;break;
-     case 0xc052:this.mixed=false;break;case 0xc053:this.mixed=true;break;
-     case 0xc054:this.page2=false;break;case 0xc055:this.page2=true;break;
-     case 0xc056:this.hires=false;break;case 0xc057:this.hires=true;break;
-   }
+ // Video fetch bypasses CPU RAMRD and follows 80STORE/PAGE2 mapping.
+ videoRead(address:number,auxiliary=false){
+  const a=address&65535;
+  if(auxiliary)return this.aux[a];
+  if(this.store80&&((a>=0x400&&a<0x800)||(this.hires&&a>=0x2000&&a<0x4000)))
+   return (this.page2?this.aux:this.ram)[a];
+  return this.ram[a];
  }
 }
