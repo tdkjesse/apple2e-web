@@ -5,6 +5,8 @@ import {encodeTrack} from './nibble';
 export class DiskII {
  image:Uint8Array|null=null;
  readonly images:(Uint8Array|null)[]=[null,null];
+ private readonly rawNibble:[Uint8Array[]|null,Uint8Array[]|null]=[null,null];
+ readonly formats:['DSK'|'NIB'|null,'DSK'|'NIB'|null]=[null,null];
  private readonly nibbleTracks:[(Uint8Array|null)[],(Uint8Array|null)[]]=[Array(35).fill(null),Array(35).fill(null)];
  private readonly positions=[0,0];
  // Fingerprint the actual mounted sector bytes, not the file name or generated GCR stream.
@@ -22,7 +24,7 @@ export class DiskII {
  private cycleRemainder=0;
  // Disk II nominal byte rate is about one byte per 32 1 MHz CPU cycles.
  tick(cycles:number){
-  if(!this.motor||!this.images[this.drive]||this.q7)return;
+  if(!this.motor||!this.mountedDrives[this.drive]||this.q7)return;
   this.cycleRemainder+=cycles;
   while(this.cycleRemainder>=32){this.cycleRemainder-=32;this.latch=this.readNibble();}
  }
@@ -32,7 +34,7 @@ export class DiskII {
  loadBootROM(bytes:Uint8Array){if(bytes.length!==256)throw new Error('Disk II slot ROM must be exactly 256 bytes');this.bootROM.set(bytes);this.bootROMLoaded=true;}
  readNibble(){
   const image=this.images[this.drive];if(!this.motor||!image)return 0;
-  const t=this.tracks[this.drive];let stream=this.nibbleTracks[this.drive][t];
+  const t=this.tracks[this.drive];let stream=this.rawNibble[this.drive]?.[t]??this.nibbleTracks[this.drive][t];
   if(!stream){stream=encodeTrack(image.subarray(t*4096,(t+1)*4096),t);this.nibbleTracks[this.drive][t]=stream;}
   const pos=this.positions[this.drive]%stream.length;
   const byte=stream[pos];this.positions[this.drive]=(pos+1)%stream.length;
@@ -44,12 +46,17 @@ export class DiskII {
  private readonly coils=[[false,false,false,false],[false,false,false,false]];
  mount(drive:number,data:Uint8Array){
   if(drive!==0&&drive!==1)throw new RangeError('Drive must be 0 or 1');
-  if(data.length!==143360)throw new Error('Expected a 140 KiB, 35-track, 16-sector .dsk image');
+  if(data.length!==143360&&data.length!==232960)throw new Error('Expected 143360-byte .dsk or 232960-byte .nib image');
+  this.formats[drive]=data.length===232960?'NIB':'DSK';
+  this.rawNibble[drive]=data.length===232960?Array.from({length:35},(_,t)=>new Uint8Array(data.slice(t*6656,(t+1)*6656))):null;
   this.images[drive]=new Uint8Array(data);this.nibbleTracks[drive].fill(null);this.positions[drive]=0;this.cycleRemainder=0;this.latch=0;this.tracks[drive]=0;this.phasesByDrive[drive]=0;
   this.coils[drive].fill(false);if(drive===this.drive)this.syncDrive();
  }
  private syncDrive(){this.image=this.images[this.drive];this.track=this.tracks[this.drive];this.phase=this.phasesByDrive[this.drive];}
  get mountedDrives(){return this.images.map(image=>image!==null);}
+ get readPosition(){return this.positions[this.drive];}
+ get readLatch(){return this.latch;}
+ get readCycles(){return this.cycleRemainder;}
 
  motor=false;drive=0;track=0;phase=0;writeMode=false;
  
@@ -62,6 +69,7 @@ export class DiskII {
   if(!this.image)throw new Error('No disk mounted');
   if(!Number.isInteger(track)||track<0||track>=35||!Number.isInteger(sector)||sector<0||sector>=16)
    throw new RangeError('Track/sector out of range');
+  if(this.formats[this.drive]!=='DSK')throw new Error('Sector access requires a .dsk image');
   return this.image.slice((track*16+sector)*256,(track*16+sector+1)*256);
  }
  access(address:number,value?:number):number{
