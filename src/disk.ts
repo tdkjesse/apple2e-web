@@ -48,6 +48,8 @@ export class DiskII {
  readonly tracks=[0,0];
  readonly phasesByDrive=[0,0];
  private readonly halfTracks=[0,0];
+ readonly headStats={transitions:0,history:[] as string[]};
+ resetHeadStats(){this.headStats.transitions=0;this.headStats.history.length=0;}
  private readonly coils=[[false,false,false,false],[false,false,false,false]];
  mount(drive:number,data:Uint8Array){
   if(drive!==0&&drive!==1)throw new RangeError('Drive must be 0 or 1');
@@ -85,7 +87,13 @@ export class DiskII {
     const forward=(this.phase+1)&3,backward=(this.phase+3)&3;
     if(phase===forward)this.halfTracks[this.drive]=Math.min(68,this.halfTracks[this.drive]+1);
     else if(phase===backward)this.halfTracks[this.drive]=Math.max(0,this.halfTracks[this.drive]-1);
+    const previousTrack=this.track;
     this.track=Math.floor(this.halfTracks[this.drive]/2);
+    if(this.track!==previousTrack){
+     this.headStats.transitions++;
+     this.headStats.history.push('D'+(this.drive+1)+':'+previousTrack+'>'+this.track);
+     if(this.headStats.history.length>12)this.headStats.history.shift();
+    }
     this.phase=phase;
    }
    this.coils[this.drive][phase]=on;
