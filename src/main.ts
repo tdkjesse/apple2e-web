@@ -1,5 +1,6 @@
 import { CPU6502 } from './cpu';
 const cpu = new CPU6502();
+cpu.demoStopOnBrk = true;
 const canvas = document.querySelector<HTMLCanvasElement>('#screen')!;
 const ctx = canvas.getContext('2d')!;
 const status = document.querySelector<HTMLElement>('#status')!;
