@@ -13,7 +13,9 @@ export function encodeSector62(data:Uint8Array):Uint8Array{
  const swap=[0,2,1,3];
  for(let i=0;i<86;i++){
   const a=data[i],b=i+86<256?data[i+86]:0,c=i+172<256?data[i+172]:0;
-  aux[i]=(swap[a&3]<<4)|(swap[b&3]<<2)|swap[c&3];
+  // The first source byte contributes the low two bits, the second the
+  // middle pair, and the third the high pair in the 6-and-2 auxiliary byte.
+  aux[i]=swap[a&3]|(swap[b&3]<<2)|(swap[c&3]<<4);
  }
  const out:number[]=[];let previous=0;
  for(let i=85;i>=0;i--){out.push(GCR62[aux[i]^previous]);previous=aux[i];}
