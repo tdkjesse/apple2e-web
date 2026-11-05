@@ -25,6 +25,8 @@ function bootSectorDiagnostic(){
  return ' | T0S0 mismatches '+differences+'/256 | diff '+changes.join(',')+' | image '+hex(expected)+' | RAM0800 '+hex(actual);
 }
 const bootTrace:number[]=[];
+const pcVisits=new Uint32Array(65536);
+let instructionCount=0;
 let reachedBootSector=false;
 let returnedToFirmware=false;
 let firmwareReturn='';
