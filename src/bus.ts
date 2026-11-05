@@ -107,6 +107,8 @@ export class AppleIIeBus {
   if(a>=0xc000&&a<=0xc00f){this.setMemorySwitch(a);return;}
   if(a>=0xd000){if(this.lcWrite)this.lcArray()[this.lcOffset(a)]=v;return;}
   if(a>=0xc000)return;
+  if(a>=0x400&&a<0xc00){this.videoWrites.text++;this.videoWrites.last=a;}
+  if(a>=0x2000&&a<0x6000){this.videoWrites.hires++;this.videoWrites.last=a;}
   this.bank(a,true)[a]=v;
  }
  // Video fetch bypasses CPU RAMRD and follows 80STORE/PAGE2 mapping.
