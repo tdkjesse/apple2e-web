@@ -83,6 +83,10 @@ export class AppleIIeBus {
    if(this.lcRead)return this.lcArray()[this.lcOffset(a)];
    return this.romLoaded?this.rom[a-0xc000]:this.ram[a];
   }
+  if(a>=0xc500&&a<=0xc6ff&&!this.intcxrom){
+   const controller=a<0xc600?this.disk5:this.disk;
+   if(controller.bootROMLoaded)return controller.bootROM[a&255];
+  }
   if(a>=0xc100&&a<=0xcfff&&this.romLoaded&&this.romStart===0xc000){
    // Internal Cx ROM is selected when INTCXROM is on; C3 also uses internal ROM
    // unless SLOTC3ROM is enabled. External slot ROMs are not emulated yet.
