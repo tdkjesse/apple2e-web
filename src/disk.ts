@@ -24,6 +24,35 @@ export class DiskII {
  private dataReady=false;
  readonly readStats={ready:0,waiting:0,overwritten:0,produced:0};
  resetReadStats(){this.readStats.ready=0;this.readStats.waiting=0;this.readStats.overwritten=0;this.readStats.produced=0;}
+ readonly sectorProbe={track:0,addresses:0,dataMarks:0,lastSector:-1,lastVolume:-1,invalidChecksums:0,sectorCounts:Array(16).fill(0) as number[],recent:[] as string[]};
+ private probeBytes:number[]=[];
+ private probeAddressRemaining=0;
+ private probeAddressBytes:number[]=[];
+ resetSectorProbe(){const p=this.sectorProbe;p.track=this.track;p.addresses=0;p.dataMarks=0;p.lastSector=-1;p.lastVolume=-1;p.invalidChecksums=0;p.sectorCounts.fill(0);p.recent.length=0;this.probeBytes.length=0;this.probeAddressRemaining=0;this.probeAddressBytes.length=0;}
+ private observeNibble(byte:number){
+  const p=this.sectorProbe;
+  if(this.track!==p.track){this.resetSectorProbe();p.track=this.track;}
+  const h=this.probeBytes;
+  h.push(byte);if(h.length>11)h.shift();
+  const n=h.length;
+  if(n>=3&&h[n-3]===0xd5&&h[n-2]===0xaa&&h[n-1]===0xad)p.dataMarks++;
+  if(n===3&&h[0]===0xd5&&h[1]===0xaa&&h[2]===0x96){
+   this.probeAddressRemaining=8;
+   this.probeAddressBytes.length=0;
+  }else if(this.probeAddressRemaining>0){
+   this.probeAddressBytes.push(byte);this.probeAddressRemaining--;
+   if(this.probeAddressRemaining===0){
+    const a=this.probeAddressBytes;
+    const decode=(x:number,y:number)=>((x<<1)|1)&y;
+    const volume=decode(a[0],a[1]),track=decode(a[2],a[3]);
+    const sector=decode(a[4],a[5]),checksum=decode(a[6],a[7]);
+    p.addresses++;p.lastVolume=volume;p.lastSector=sector;
+    if((volume^track^sector)!==checksum)p.invalidChecksums++;
+    if(sector<16)p.sectorCounts[sector]++;
+    p.recent.push('T'+track+'S'+sector);if(p.recent.length>12)p.recent.shift();
+   }
+  }
+ }
  private cycleRemainder=0;
  // Disk II nominal byte rate is about one byte per 32 1 MHz CPU cycles.
  tick(cycles:number){
@@ -42,6 +71,7 @@ export class DiskII {
   if(!stream){stream=encodeTrack(image.subarray(t*4096,(t+1)*4096),t);this.nibbleTracks[this.drive][t]=stream;}
   const pos=this.positions[this.drive]%stream.length;
   const byte=stream[pos];this.positions[this.drive]=(pos+1)%stream.length;
+  this.observeNibble(byte);
   return byte;
  }
 
