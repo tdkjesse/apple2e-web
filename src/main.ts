@@ -1,14 +1,25 @@
 import {CPU6502} from './cpu';
 import {AppleIIeBus} from './bus';
 import {renderGraphics} from './graphics';
+import {AppleSpeaker} from './speaker';
 const bus=new AppleIIeBus(),cpu=new CPU6502();
 cpu.bus=bus;cpu.demoStopOnBrk=true;
+const speaker=new AppleSpeaker(bus);
 const canvas=document.querySelector<HTMLCanvasElement>('#screen')!;
 const ctx=canvas.getContext('2d')!;
 const status=document.querySelector<HTMLElement>('#status')!;
 const keyboard=document.querySelector<HTMLInputElement>('#keyboard')!;
 const speedSlider=document.querySelector<HTMLInputElement>('#speed')!;
 const speedValue=document.querySelector<HTMLOutputElement>('#speed-value')!;
+const soundToggle=document.querySelector<HTMLButtonElement>('#sound-toggle')!;
+const volumeSlider=document.querySelector<HTMLInputElement>('#volume')!;
+const volumeValue=document.querySelector<HTMLOutputElement>('#volume-value')!;
+soundToggle.addEventListener('click',async()=>{
+ if(speaker.enabled){speaker.disable();soundToggle.textContent='Enable sound';}
+ else try{await speaker.enable();soundToggle.textContent='Mute sound';}
+ catch(e){lastError='Audio unavailable: '+String(e);draw();}
+});
+volumeSlider.addEventListener('input',()=>{speaker.volume=Number(volumeSlider.value)/100;volumeValue.textContent=volumeSlider.value+'%';});
 let speedMultiplier=1;
 speedSlider.addEventListener('input',()=>{
  speedMultiplier=Math.max(1,Math.min(8,Number(speedSlider.value)||1));
@@ -134,7 +145,7 @@ function traceDiagnostic(){
 }
 function frame(){
  if(!running)return;
- try {for(let i=0;i<12000*speedMultiplier&&!cpu.halted;i++)traceStep();draw();if(cpu.halted)running=false;}
+ try {for(let i=0;i<12000*speedMultiplier&&!cpu.halted;i++)traceStep();speaker.flush(speedMultiplier);draw();if(cpu.halted)running=false;}
  catch(e){
   const pc=(cpu.pc-1)&0xffff;
   const bytes=Array.from({length:16},(_,i)=>bus.read((pc-8+i)&0xffff).toString(16).padStart(2,'0')).join(' ');
