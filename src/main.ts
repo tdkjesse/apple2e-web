@@ -46,7 +46,7 @@ function draw(){
    ctx.fillText(ch,x,y);
   }
  }
- status.textContent='PC: $'+cpu.pc.toString(16).padStart(4,'0')+' A: $'+cpu.a.toString(16).padStart(2,'0')+' | '+(romMode?'ROM':'DEMO')+' | '+(running?'RUNNING':cpu.halted?'HALTED':'PAUSED')+' | '+columns+' COL'+(lastError?' | '+lastError:'');
+ status.textContent='PC: $'+cpu.pc.toString(16).padStart(4,'0')+' A: $'+cpu.a.toString(16).padStart(2,'0')+' | '+(romMode?'ROM':'DEMO')+' | '+(running?'RUNNING':cpu.halted?'HALTED':'PAUSED')+' | '+columns+' COL'+' | Disk: '+(bus.disk.mounted?'MOUNTED':'NONE')+(lastError?' | '+lastError:'');
 }
 document.querySelector('#reset')!.addEventListener('click',()=>{stop();lastError='';if(romMode){bus.reset();cpu.reset();draw();}else loadDemo();});
 document.querySelector('#step')!.addEventListener('click',()=>{stop();try{cpu.step();draw();}catch(e){status.textContent=String(e);}});
@@ -58,6 +58,11 @@ document.querySelector('#rom')!.addEventListener('change',async event=>{
   bus.loadROM(new Uint8Array(await file.arrayBuffer()));
   bus.ram.fill(0);bus.reset();romMode=true;cpu.demoStopOnBrk=false;cpu.reset();draw();
  }catch(e){status.textContent=String(e);}
+});
+document.querySelector('#disk')!.addEventListener('change',async event=>{
+ const file=(event.target as HTMLInputElement).files?.[0];if(!file)return;
+ try{bus.disk.load(new Uint8Array(await file.arrayBuffer()));lastError='';draw();}
+ catch(e){lastError=String(e);draw();}
 });
 keyboard.addEventListener('keydown',e=>{
  let code=0;
