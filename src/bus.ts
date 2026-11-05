@@ -1,5 +1,7 @@
+import {DiskII} from './disk';
 // Apple IIe main/auxiliary memory and language-card model (initial implementation).
 export class AppleIIeBus {
+ readonly disk=new DiskII();
  readonly ram=new Uint8Array(65536);
  readonly aux=new Uint8Array(65536);
  readonly rom=new Uint8Array(0x4000);
@@ -62,6 +64,7 @@ export class AppleIIeBus {
  }
  read(address:number):number{
   const a=address&65535;
+  if(a>=0xc0e0&&a<=0xc0ef)return this.disk.access(a);
   if(a===0xc000)return this.keyboard;
   if(a===0xc010){const v=this.keyboard;this.keyboard&=127;return v;}
   if(a>=0xc080&&a<=0xc08f){this.languageSwitch(a);return 0;}
@@ -87,6 +90,7 @@ export class AppleIIeBus {
  }
  write(address:number,value:number){
   const a=address&65535,v=value&255;
+  if(a>=0xc0e0&&a<=0xc0ef){this.disk.access(a,v);return;}
   if(a>=0xc080&&a<=0xc08f){this.languageSwitch(a);return;}
   if(a>=0xc050&&a<=0xc057){this.softSwitch(a);return;}
   if(a===0xc010){this.keyboard&=127;return;}
