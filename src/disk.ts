@@ -22,12 +22,15 @@ export class DiskII {
  private q7=false;
  private latch=0;
  private dataReady=false;
+ readonly readStats={ready:0,waiting:0,overwritten:0,produced:0};
+ resetReadStats(){this.readStats.ready=0;this.readStats.waiting=0;this.readStats.overwritten=0;this.readStats.produced=0;}
  private cycleRemainder=0;
  // Disk II nominal byte rate is about one byte per 32 1 MHz CPU cycles.
  tick(cycles:number){
   if(!this.motor||!this.mountedDrives[this.drive]||this.q7)return;
   this.cycleRemainder+=cycles;
-  while(this.cycleRemainder>=32){this.cycleRemainder-=32;this.latch=this.readNibble();this.dataReady=true;}
+  while(this.cycleRemainder>=32){this.cycleRemainder-=32;if(this.dataReady)this.readStats.overwritten++;
+   this.latch=this.readNibble();this.dataReady=true;this.readStats.produced++;}
  }
 
  readonly bootROM=new Uint8Array(256);
@@ -96,6 +99,7 @@ export class DiskII {
   // Reading the Q6-low data register acknowledges the current byte.
   // Until another byte arrives, bit 7 is clear, allowing the boot ROM's BMI polling loop to wait.
   if(sw===12&&!this.q6&&!this.q7&&value===undefined){
+   if(this.dataReady)this.readStats.ready++;else this.readStats.waiting++;
    const result=this.dataReady?this.latch:this.latch&0x7f;
    this.dataReady=false;
    return result;
