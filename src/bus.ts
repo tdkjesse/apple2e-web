@@ -4,7 +4,12 @@ export class AppleIIeBus {
  readonly disk=new DiskII();
  readonly disk5=new DiskII();
  readonly diskControllers:Record<number,DiskII>={5:this.disk5,6:this.disk};
- tick(cycles:number){this.disk.tick(cycles);this.disk5.tick(cycles);}
+ tick(cycles:number){this.speakerCycles+=cycles;this.disk.tick(cycles);this.disk5.tick(cycles);}
+ speakerCycles=0;
+ speakerLevel=0;
+ readonly speakerEdges:number[]=[];
+ toggleSpeaker(){this.speakerLevel^=1;this.speakerEdges.push(this.speakerCycles);}
+ resetSpeaker(){this.speakerCycles=0;this.speakerLevel=0;this.speakerEdges.length=0;}
 
  readonly videoWrites={text:0,hires:0,last:0};
  readonly recentTextWrites:{address:number;value:number;aux:boolean}[]=[];
@@ -26,7 +31,7 @@ export class AppleIIeBus {
  lcRead=false;lcWrite=false;lcBank2=true;
  private lcPrewrite=false;
  reset(){
-  this.keyboard=0;this.keyQueue.length=0;this.keyStats.submitted=0;this.keyStats.acknowledged=0;this.text=true;this.mixed=false;this.page2=false;this.hires=false;this.col80=false;
+  this.resetSpeaker();this.keyboard=0;this.keyQueue.length=0;this.keyStats.submitted=0;this.keyStats.acknowledged=0;this.text=true;this.mixed=false;this.page2=false;this.hires=false;this.col80=false;
   this.store80=this.ramrd=this.ramwrt=this.altzp=this.intcxrom=this.slotc3rom=false;
   this.lcRead=this.lcWrite=false;this.lcBank2=true;this.lcPrewrite=false;
  }
@@ -82,6 +87,7 @@ export class AppleIIeBus {
   const a=address&65535;
   if(a>=0xc0d0&&a<=0xc0df)return this.disk5.access(a);
   if(a>=0xc0e0&&a<=0xc0ef)return this.disk.access(a);
+  if(a===0xc030){this.toggleSpeaker();return 0;}
   if(a===0xc000)return this.keyboard;
   if(a===0xc010){const v=this.keyboard;this.acknowledgeKey();return v;}
   if(a>=0xc080&&a<=0xc08f){this.languageSwitch(a);return 0;}
@@ -115,6 +121,7 @@ export class AppleIIeBus {
   if(a>=0xc0e0&&a<=0xc0ef){this.disk.access(a,v);return;}
   if(a>=0xc080&&a<=0xc08f){this.languageSwitch(a);return;}
   if(a>=0xc050&&a<=0xc057){this.softSwitch(a);return;}
+  if(a===0xc030){this.toggleSpeaker();return;}
   if(a===0xc010){this.acknowledgeKey();return;}
   if(a>=0xc000&&a<=0xc00f){this.setMemorySwitch(a);return;}
   if(a>=0xd000){if(this.lcWrite)this.lcArray()[this.lcOffset(a)]=v;return;}
