@@ -7,7 +7,17 @@ const ctx=canvas.getContext('2d')!;
 const status=document.querySelector<HTMLElement>('#status')!;
 const keyboard=document.querySelector<HTMLInputElement>('#keyboard')!;
 let romMode=false;
+let running=false;
+let lastError='';
+function stop(){running=false;}
+function frame(){
+ if(!running)return;
+ try {cpu.run(12000);draw();if(cpu.halted)running=false;}
+ catch(e){lastError=String(e);running=false;draw();}
+ if(running)requestAnimationFrame(frame);
+}
 function loadDemo(){
+ stop();lastError='';
  romMode=false;cpu.demoStopOnBrk=true;bus.ram.fill(0);bus.aux.fill(0);bus.reset();
  const message='HELLO, APPLE II!';
  const program:number[]=[];
@@ -16,26 +26,35 @@ function loadDemo(){
 }
 function draw(){
  ctx.fillStyle='#071007';ctx.fillRect(0,0,canvas.width,canvas.height);
- ctx.fillStyle='#7dff89';ctx.font='18px monospace';ctx.textBaseline='top';
- if(!bus.text&&!bus.mixed){ctx.fillText('GRAPHICS MODE (NOT YET IMPLEMENTED)',8,20);}
+ const columns=bus.col80?80:40;
+ const charWidth=canvas.width/columns;
+ ctx.font=(bus.col80?'10':'18')+'px monospace';
+ ctx.textBaseline='top';
+ if(!bus.text&&!bus.mixed){ctx.fillStyle='#7dff89';ctx.fillText('GRAPHICS MODE (NOT YET IMPLEMENTED)',8,20);}
  else for(let row=0;row<24;row++){
   if(!bus.text&&row<20)continue;
-  let line='';
-  for(let col=0;col<40;col++){
-   const addr=(bus.store80?0x400:(bus.page2?0x800:0x400))+((row&7)<<7)+Math.floor(row/8)*40+col;
-   const b=bus.videoRead(addr);line+=b>=0xa0?String.fromCharCode(b&0x7f):' ';
+  for(let col=0;col<columns;col++){
+   const address=(bus.store80?0x400:(bus.page2?0x800:0x400))+((row&7)<<7)+Math.floor(row/8)*40+(bus.col80?Math.floor(col/2):col);
+   const b=bus.col80?bus.videoRead(address,col%2===0):bus.videoRead(address);
+   const glyph=b&0x3f;
+   const ch=String.fromCharCode(glyph<32?glyph+64:glyph);
+   const inverse=b<0x40;
+   const flash=b>=0x40&&b<0x80&&Math.floor(Date.now()/500)%2===0;
+   const x=col*charWidth,y=row*16;
+   if(inverse||flash){ctx.fillStyle='#7dff89';ctx.fillRect(x,y,charWidth,16);ctx.fillStyle='#071007';}
+   else ctx.fillStyle='#7dff89';
+   ctx.fillText(ch,x,y);
   }
-  ctx.fillText(line,8,row*16);
  }
- status.textContent='PC: $'+cpu.pc.toString(16).padStart(4,'0')+' A: $'+cpu.a.toString(16).padStart(2,'0')+' Halted: '+cpu.halted+' | '+(romMode?'ROM':'DEMO')+' | Key: $'+bus.keyboard.toString(16).padStart(2,'0');
+ status.textContent='PC: $'+cpu.pc.toString(16).padStart(4,'0')+' A: $'+cpu.a.toString(16).padStart(2,'0')+' | '+(romMode?'ROM':'DEMO')+' | '+(running?'RUNNING':cpu.halted?'HALTED':'PAUSED')+' | '+columns+' COL'+(lastError?' | '+lastError:'');
 }
-function runSteps(count:number){try{cpu.run(count);draw();}catch(e){status.textContent=String(e);}}
-document.querySelector('#reset')!.addEventListener('click',()=>{if(romMode){bus.reset();cpu.reset();draw();}else loadDemo();});
-document.querySelector('#step')!.addEventListener('click',()=>{try{cpu.step();draw();}catch(e){status.textContent=String(e);}});
-document.querySelector('#run')!.addEventListener('click',()=>runSteps(10000));
+document.querySelector('#reset')!.addEventListener('click',()=>{stop();lastError='';if(romMode){bus.reset();cpu.reset();draw();}else loadDemo();});
+document.querySelector('#step')!.addEventListener('click',()=>{stop();try{cpu.step();draw();}catch(e){status.textContent=String(e);}});
+document.querySelector('#run')!.addEventListener('click',()=>{if(running){stop();draw();}else{running=true;frame();}});
 document.querySelector('#rom')!.addEventListener('change',async event=>{
  const file=(event.target as HTMLInputElement).files?.[0];if(!file)return;
  try{
+  stop();lastError='';
   bus.loadROM(new Uint8Array(await file.arrayBuffer()));
   bus.ram.fill(0);bus.reset();romMode=true;cpu.demoStopOnBrk=false;cpu.reset();draw();
  }catch(e){status.textContent=String(e);}
@@ -48,5 +67,5 @@ keyboard.addEventListener('keydown',e=>{
  else if(e.key.length===1)code=e.key.toUpperCase().charCodeAt(0)&127;
  if(code){bus.key(code);e.preventDefault();draw();}
 });
-keyboard.addEventListener('input',()=>{keyboard.value='';});
+keyboard.addEventListener('input',()=>{for(const ch of keyboard.value){bus.key(ch.toUpperCase().charCodeAt(0)&127);}keyboard.value='';draw();});
 loadDemo();
