@@ -35,6 +35,7 @@ define('JMP',['abs','ind'],[0x4c,0x6c],[3,5]);
 export class CPU6502 {
  readonly memory = new Uint8Array(65536);
  a=0; x=0; y=0; pc=0; sp=0xfd; status=0x24; halted=false; cycles=0;
+ demoStopOnBrk=false; // Only for the temporary browser demo; not authentic hardware.
  private irqPending=false; private nmiPending=false;
  reset(pc?:number) {
    this.a=this.x=this.y=0; this.sp=0xfd; this.status=0x24; this.halted=false; this.cycles=0;
@@ -137,7 +138,7 @@ export class CPU6502 {
      case 'JMP':this.pc=addr;break;
      case 'JSR':{const ret=(this.pc-1)&65535;this.push(ret>>8);this.push(ret&255);this.pc=addr;break;}
      case 'RTS':this.pc=((this.pop()|(this.pop()<<8))+1)&65535;break;
-     case 'BRK':this.pc=(this.pc+1)&65535;this.interrupt(0xfffe,true);this.cycles-=7;break;
+     case 'BRK':if(this.demoStopOnBrk){this.halted=true;break;}this.pc=(this.pc+1)&65535;this.interrupt(0xfffe,true);this.cycles-=7;break;
      case 'RTI':this.status=(this.pop()|0x20)&~0x10;this.pc=this.pop()|(this.pop()<<8);break;
      case 'PHA':this.push(this.a);break;
      case 'PHP':this.push(this.status|0x30);break;
