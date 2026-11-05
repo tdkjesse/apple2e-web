@@ -10,7 +10,9 @@ function fourAndFour(n:number){return [((n>>1)|0xaa)&255,(n|0xaa)&255];}
 export function encodeSector62(data:Uint8Array):Uint8Array{
  if(data.length!==256)throw new Error('6-and-2 requires 256 bytes');
  const aux=new Uint8Array(86);
- const swap=[0,2,1,3];
+ // Disk II boot ROM shifts auxiliary bits into the sector buffer in
+ // reverse source-pair order. The low two bits are stored un-swapped.
+ const swap=[0,1,2,3];
  for(let i=0;i<86;i++){
   const a=data[i],b=i+86<256?data[i+86]:0,c=i+172<256?data[i+172]:0;
   // The first source byte contributes the low two bits, the second the
