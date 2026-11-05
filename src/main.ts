@@ -96,10 +96,32 @@ function sectorScanDiagnostic(){
   ' | closest '+best.slice(0,5).map(x=>'T'+x.track+'S'+x.sector+'@'+hex16(x.address)+':'+x.score+'/256').join(',');
  return sectorScanCache;
 }
+function textPageDiagnostic(){
+ const base=bus.page2&&!bus.store80?0x800:0x400;
+ const hex=(n:number)=>n.toString(16).padStart(2,'0');
+ const lines:string[]=[];
+ let nonzero=0,printable=0;
+ for(let row=0;row<24;row++){
+  let sample='';
+  for(let col=0;col<40;col++){
+   const address=base+((row&7)<<7)+Math.floor(row/8)*40+col;
+   const b=bus.videoRead(address);
+   if(b!==0)nonzero++;
+   const glyph=b&0x3f;
+   const code=glyph<32?glyph+64:glyph;
+   if(code>=32&&code<=126)printable++;
+   if(col<16)sample+=String.fromCharCode(code);
+  }
+  if(row<4||row>=20)lines.push(row+':'+sample);
+ }
+ const writes=bus.recentTextWrites.map(w=>(w.aux?'A':'M')+hex16(w.address)+'='+hex(w.value)).join(',');
+ return ' | text page '+hex16(base)+' nonzero '+nonzero+'/960 printable '+printable+
+  ' | rows '+lines.join(' / ')+' | recent text writes '+writes;
+}
 function traceDiagnostic(){
  return ' | boot $0800 '+(reachedBootSector?'YES':'NO')+
   ' | firmware return '+(returnedToFirmware?firmwareReturn:'NO')+
-  ' | recent PCs '+bootTrace.map(hex16).join(' ')+cpuContext()+diskReadDiagnostic()+loaderDiagnostic()+bootSectorDiagnostic()+sectorScanDiagnostic();
+  ' | recent PCs '+bootTrace.map(hex16).join(' ')+cpuContext()+diskReadDiagnostic()+loaderDiagnostic()+bootSectorDiagnostic()+sectorScanDiagnostic()+textPageDiagnostic();
 }
 function frame(){
  if(!running)return;
