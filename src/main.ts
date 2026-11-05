@@ -55,12 +55,18 @@ function hex16(n:number){return '$'+n.toString(16).padStart(4,'0');}
 function stop(){running=false;sectorScanCache='';}
 const loaderBranches=new Map<number,{taken:number;notTaken:number;target:number}>();
 const loaderExits=new Map<string,number>();
+const extendedVisits=new Map<number,number>();
+const extendedBranches=new Map<number,{taken:number;notTaken:number;target:number}>();
 const loaderRecent:string[]=[];
 function loaderBranchDiagnostic(){
  const branches=[...loaderBranches.entries()].sort((a,b)=>(b[1].taken+b[1].notTaken)-(a[1].taken+a[1].notTaken)).slice(0,12);
+ const extended=[...extendedVisits.entries()].sort((a,b)=>b[1]-a[1]).slice(0,10);
+ const extendedB=[...extendedBranches.entries()].sort((a,b)=>(b[1].taken+b[1].notTaken)-(a[1].taken+a[1].notTaken)).slice(0,10);
  const exits=[...loaderExits.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8);
  return ' | loader branches '+branches.map(([pc,v])=>hex16(pc)+'>'+hex16(v.target)+':'+v.taken+'/'+v.notTaken).join(',')+
   ' | exits '+exits.map(([k,n])=>k+':'+n).join(',')+
+  ' | BE-BF hot '+extended.map(([pc,n])=>hex16(pc)+':'+n).join(',')+
+  ' | BE-BF branches '+extendedB.map(([pc,v])=>hex16(pc)+'>'+hex16(v.target)+':'+v.taken+'/'+v.notTaken).join(',')+
   ' | ZP46/47 '+bus.ram[0x46]+'/'+bus.ram[0x47]+
   ' | loader recent ['+loaderRecent.join(',')+']';
 }
@@ -68,8 +74,9 @@ function traceStep(){
  if(!running)sectorScanCache='';
  const before=cpu.pc;
  const traceLoader=romMode&&before>=0xba00&&before<0xbe00;
- const opcode=traceLoader?bus.ram[before]:0;
- const branch=traceLoader&&[0x10,0x30,0x50,0x70,0x90,0xb0,0xd0,0xf0].includes(opcode);
+ const traceExtended=romMode&&before>=0xbe00&&before<0xc000;
+ const opcode=traceLoader||traceExtended?bus.read(before):0;
+ const branch=(traceLoader||traceExtended)&&[0x10,0x30,0x50,0x70,0x90,0xb0,0xd0,0xf0].includes(opcode);
  const target=branch?(before+2+((bus.ram[(before+1)&65535]<<24)>>24))&65535:0;
  if(romMode){
   pcVisits[before]++;instructionCount++;
@@ -82,6 +89,13 @@ function traceStep(){
   }
  }
  cpu.step();
+ if(traceExtended){
+  extendedVisits.set(before,(extendedVisits.get(before)||0)+1);
+  if(branch){let rec=extendedBranches.get(before);
+   if(!rec){rec={taken:0,notTaken:0,target};extendedBranches.set(before,rec);}
+   if(cpu.pc===target)rec.taken++;else rec.notTaken++;
+  }
+ }
  if(traceLoader){
   if(branch){
    let record=loaderBranches.get(before);
