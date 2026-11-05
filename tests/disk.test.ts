@@ -19,10 +19,10 @@ describe('Phase 6 Disk II groundwork',()=>{
   const d=new DiskII();d.load(new Uint8Array(143360).fill(0xff));
   d.access(0xc0e9);
   // The encoded track begins with sync bytes, not raw sector payload.
-  expect(d.access(0xc0ec)).toBe(0xff);
-  for(let i=0;i<15;i++)d.access(0xc0ec);
-  expect(d.access(0xc0ec)).toBe(0xd5); // address-field prologue
-  expect(d.access(0xc0ec)).toBe(0xaa);
-  expect(d.access(0xc0ec)).toBe(0x96);
+  d.tick(32);expect(d.access(0xc0ec)).toBe(0xff);
+  d.tick(32*15);expect(d.access(0xc0ec)).toBe(0xff);
+  d.tick(32);expect(d.access(0xc0ec)).toBe(0xd5); // address-field prologue
+  d.tick(32);expect(d.access(0xc0ec)).toBe(0xaa);
+  d.tick(32);expect(d.access(0xc0ec)).toBe(0x96);
  });
 });
