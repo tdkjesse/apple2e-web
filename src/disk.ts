@@ -16,7 +16,7 @@ export class DiskII {
   for(const byte of image){hash=Math.imul(hash^byte,16777619)>>>0;}
   return hash.toString(16).padStart(8,'0');
  }
- rewind(drive:number){if(drive!==0&&drive!==1)throw new RangeError('Drive must be 0 or 1');this.positions[drive]=0;this.cycleRemainder=0;this.latch=0;this.dataReady=false;this.tracks[drive]=0;this.phasesByDrive[drive]=0;this.coils[drive].fill(false);if(this.drive===drive)this.syncDrive();}
+ rewind(drive:number){if(drive!==0&&drive!==1)throw new RangeError('Drive must be 0 or 1');this.positions[drive]=0;this.cycleRemainder=0;this.latch=0;this.dataReady=false;this.tracks[drive]=0;this.phasesByDrive[drive]=0;this.halfTracks[drive]=0;this.coils[drive].fill(false);if(this.drive===drive)this.syncDrive();}
 
  private q6=false;
  private q7=false;
@@ -47,13 +47,14 @@ export class DiskII {
 
  readonly tracks=[0,0];
  readonly phasesByDrive=[0,0];
+ private readonly halfTracks=[0,0];
  private readonly coils=[[false,false,false,false],[false,false,false,false]];
  mount(drive:number,data:Uint8Array){
   if(drive!==0&&drive!==1)throw new RangeError('Drive must be 0 or 1');
   if(data.length!==143360&&data.length!==232960)throw new Error('Expected 143360-byte .dsk or 232960-byte .nib image');
   this.formats[drive]=data.length===232960?'NIB':'DSK';
   this.rawNibble[drive]=data.length===232960?Array.from({length:35},(_,t)=>new Uint8Array(data.slice(t*6656,(t+1)*6656))):null;
-  this.images[drive]=new Uint8Array(data);this.nibbleTracks[drive].fill(null);this.positions[drive]=0;this.cycleRemainder=0;this.latch=0;this.tracks[drive]=0;this.phasesByDrive[drive]=0;
+  this.images[drive]=new Uint8Array(data);this.nibbleTracks[drive].fill(null);this.positions[drive]=0;this.cycleRemainder=0;this.latch=0;this.tracks[drive]=0;this.phasesByDrive[drive]=0;this.halfTracks[drive]=0;
   this.coils[drive].fill(false);if(drive===this.drive)this.syncDrive();
  }
  private syncDrive(){this.image=this.images[this.drive];this.track=this.tracks[this.drive];this.phase=this.phasesByDrive[this.drive];}
@@ -82,8 +83,9 @@ export class DiskII {
    const phase=sw>>1,on=!!(sw&1);
    if(on&&!this.coils[this.drive][phase]){
     const forward=(this.phase+1)&3,backward=(this.phase+3)&3;
-    if(phase===forward)this.track=Math.min(34,this.track+1);
-    else if(phase===backward)this.track=Math.max(0,this.track-1);
+    if(phase===forward)this.halfTracks[this.drive]=Math.min(68,this.halfTracks[this.drive]+1);
+    else if(phase===backward)this.halfTracks[this.drive]=Math.max(0,this.halfTracks[this.drive]-1);
+    this.track=Math.floor(this.halfTracks[this.drive]/2);
     this.phase=phase;
    }
    this.coils[this.drive][phase]=on;
