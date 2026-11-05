@@ -46,7 +46,7 @@ function draw(){
    ctx.fillText(ch,x,y);
   }
  }
- status.textContent='PC: $'+cpu.pc.toString(16).padStart(4,'0')+' A: $'+cpu.a.toString(16).padStart(2,'0')+' | '+(romMode?'ROM':'DEMO')+' | '+(running?'RUNNING':cpu.halted?'HALTED':'PAUSED')+' | '+columns+' COL'+' | Disk: '+(bus.disk.mounted?'MOUNTED':'NONE')+(lastError?' | '+lastError:'');
+ status.textContent='PC: $'+cpu.pc.toString(16).padStart(4,'0')+' A: $'+cpu.a.toString(16).padStart(2,'0')+' | '+(romMode?'ROM':'DEMO')+' | '+(running?'RUNNING':cpu.halted?'HALTED':'PAUSED')+' | '+columns+' COL'+' | Drives: '+[6,5].flatMap(slot=>bus.diskControllers[slot].mountedDrives.map((mounted,i)=>'S'+slot+'D'+(i+1)+':'+(mounted?'M':'-'))).join(' ')+(lastError?' | '+lastError:'');
 }
 document.querySelector('#reset')!.addEventListener('click',()=>{stop();lastError='';if(romMode){bus.reset();cpu.reset();draw();}else loadDemo();});
 document.querySelector('#step')!.addEventListener('click',()=>{stop();try{cpu.step();draw();}catch(e){status.textContent=String(e);}});
@@ -59,11 +59,11 @@ document.querySelector('#rom')!.addEventListener('change',async event=>{
   bus.ram.fill(0);bus.reset();romMode=true;cpu.demoStopOnBrk=false;cpu.reset();draw();
  }catch(e){status.textContent=String(e);}
 });
-document.querySelector('#disk')!.addEventListener('change',async event=>{
+document.querySelectorAll<HTMLInputElement>('.disk-image').forEach(input=>input.addEventListener('change',async event=>{
  const file=(event.target as HTMLInputElement).files?.[0];if(!file)return;
- try{bus.disk.load(new Uint8Array(await file.arrayBuffer()));lastError='';draw();}
+ try{const slot=Number(input.dataset.slot),drive=Number(input.dataset.drive);bus.diskControllers[slot].mount(drive,new Uint8Array(await file.arrayBuffer()));lastError='';draw();}
  catch(e){lastError=String(e);draw();}
-});
+}));
 keyboard.addEventListener('keydown',e=>{
  let code=0;
  if(e.key==='Enter')code=13;
