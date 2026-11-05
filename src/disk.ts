@@ -36,7 +36,7 @@ export class DiskII {
   h.push(byte);if(h.length>11)h.shift();
   const n=h.length;
   if(n>=3&&h[n-3]===0xd5&&h[n-2]===0xaa&&h[n-1]===0xad)p.dataMarks++;
-  if(n===3&&h[0]===0xd5&&h[1]===0xaa&&h[2]===0x96){
+  if(n>=3&&h[n-3]===0xd5&&h[n-2]===0xaa&&h[n-1]===0x96){
    this.probeAddressRemaining=8;
    this.probeAddressBytes.length=0;
   }else if(this.probeAddressRemaining>0){
