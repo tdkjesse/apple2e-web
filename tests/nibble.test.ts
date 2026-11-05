@@ -23,6 +23,31 @@ describe('Disk II DOS 3.3 nibblization',()=>{
   expect(count([0xd5,0xaa,0xad])).toBe(16);
   expect(DOS33_PHYSICAL_TO_LOGICAL.length).toBe(16);
  });
+
+ it('round-trips nontrivial sectors through an independent 6-and-2 decoder',()=>{
+  const reverse=new Map(Array.from(GCR62,(v,i)=>[v,i]));
+  const swap=[0,2,1,3];
+  for(const seed of [0,1,73,255]){
+   const source=Uint8Array.from({length:256},(_,i)=>(i*37+seed+(i*i%251))&255);
+   const encoded=encodeSector62(source);
+   let previous=0;
+   const decoded=new Uint8Array(342);
+   for(let i=0;i<342;i++){
+    const n=reverse.get(encoded[i]);expect(n).toBeDefined();
+    decoded[i]=n!^previous;previous=decoded[i];
+   }
+   expect(reverse.get(encoded[342])!^previous).toBe(0);
+   const result=new Uint8Array(256);
+   for(let i=0;i<256;i++)result[i]=decoded[86+i]<<2;
+   for(let i=0;i<86;i++){
+    const aux=decoded[85-i];
+    result[i]|=swap[aux&3];
+    if(i+86<256)result[i+86]|=swap[(aux>>2)&3];
+    if(i+172<256)result[i+172]|=swap[(aux>>4)&3];
+   }
+   expect(result).toEqual(source);
+  }
+ });
  it('rejects incorrect sector and track lengths',()=>{
   expect(()=>encodeSector62(new Uint8Array(255))).toThrow();
   expect(()=>encodeTrack(new Uint8Array(100),0)).toThrow();
