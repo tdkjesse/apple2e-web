@@ -10,7 +10,8 @@ describe('four floppy drives across two controllers',()=>{
   expect(d.sector(0,0)[0]).toBe(11);
  });
  it('keeps each drive head position separate',()=>{
-  const d=new DiskII();d.access(0xc0e3);expect(d.track).toBe(1);
+  const d=new DiskII();d.access(0xc0e3);expect(d.track).toBe(0);
+  d.access(0xc0e5);expect(d.track).toBe(1);
   d.access(0xc0eb);expect(d.track).toBe(0);
   d.access(0xc0ea);expect(d.track).toBe(1);
  });
