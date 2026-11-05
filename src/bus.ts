@@ -7,7 +7,8 @@ export class AppleIIeBus {
  tick(cycles:number){this.disk.tick(cycles);this.disk5.tick(cycles);}
 
  readonly videoWrites={text:0,hires:0,last:0};
- resetVideoWrites(){this.videoWrites.text=0;this.videoWrites.hires=0;this.videoWrites.last=0;}
+ readonly recentTextWrites:{address:number;value:number;aux:boolean}[]=[];
+ resetVideoWrites(){this.videoWrites.text=0;this.videoWrites.hires=0;this.videoWrites.last=0;this.recentTextWrites.length=0;}
  readonly ram=new Uint8Array(65536);
  readonly aux=new Uint8Array(65536);
  readonly rom=new Uint8Array(0x4000);
@@ -109,7 +110,12 @@ export class AppleIIeBus {
   if(a>=0xc000&&a<=0xc00f){this.setMemorySwitch(a);return;}
   if(a>=0xd000){if(this.lcWrite)this.lcArray()[this.lcOffset(a)]=v;return;}
   if(a>=0xc000)return;
-  if(a>=0x400&&a<0xc00){this.videoWrites.text++;this.videoWrites.last=a;}
+  if(a>=0x400&&a<0xc00){
+   this.videoWrites.text++;this.videoWrites.last=a;
+   const aux=this.bank(a,true)===this.aux;
+   this.recentTextWrites.push({address:a,value:v,aux});
+   if(this.recentTextWrites.length>12)this.recentTextWrites.shift();
+  }
   if(a>=0x2000&&a<0x6000){this.videoWrites.hires++;this.videoWrites.last=a;}
   this.bank(a,true)[a]=v;
  }
