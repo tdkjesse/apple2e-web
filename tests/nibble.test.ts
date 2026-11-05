@@ -26,7 +26,7 @@ describe('Disk II DOS 3.3 nibblization',()=>{
 
  it('round-trips nontrivial sectors through an independent 6-and-2 decoder',()=>{
   const reverse=new Map(Array.from(GCR62,(v,i)=>[v,i]));
-  const swap=[0,2,1,3];
+  const swap=[0,1,2,3];
   for(const seed of [0,1,73,255]){
    const source=Uint8Array.from({length:256},(_,i)=>(i*37+seed+(i*i%251))&255);
    const encoded=encodeSector62(source);
