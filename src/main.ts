@@ -1,5 +1,6 @@
 import {CPU6502} from './cpu';
 import {AppleIIeBus} from './bus';
+import {renderGraphics} from './graphics';
 const bus=new AppleIIeBus(),cpu=new CPU6502();
 cpu.bus=bus;cpu.demoStopOnBrk=true;
 const canvas=document.querySelector<HTMLCanvasElement>('#screen')!;
@@ -148,8 +149,8 @@ function draw(){
  const charWidth=canvas.width/columns;
  ctx.font=(bus.col80?'10':'18')+'px monospace';
  ctx.textBaseline='top';
- if(!bus.text&&!bus.mixed){ctx.fillStyle='#7dff89';ctx.fillText('GRAPHICS MODE (NOT YET IMPLEMENTED)',8,20);}
- else for(let row=0;row<24;row++){
+ if(!bus.text)renderGraphics(ctx,bus,canvas.width,canvas.height);
+ if(bus.text||bus.mixed)for(let row=0;row<24;row++){
   if(!bus.text&&row<20)continue;
   for(let col=0;col<columns;col++){
    const address=(bus.store80?0x400:(bus.page2?0x800:0x400))+((row&7)<<7)+Math.floor(row/8)*40+(bus.col80?Math.floor(col/2):col);
