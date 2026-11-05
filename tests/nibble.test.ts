@@ -41,9 +41,9 @@ describe('Disk II DOS 3.3 nibblization',()=>{
    for(let i=0;i<256;i++)result[i]=decoded[86+i]<<2;
    for(let i=0;i<86;i++){
     const aux=decoded[85-i];
-    result[i]|=swap[(aux>>4)&3];
+    result[i]|=swap[aux&3];
     if(i+86<256)result[i+86]|=swap[(aux>>2)&3];
-    if(i+172<256)result[i+172]|=swap[aux&3];
+    if(i+172<256)result[i+172]|=swap[(aux>>4)&3];
    }
    expect(result).toEqual(source);
   }
