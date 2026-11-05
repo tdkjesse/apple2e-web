@@ -16,12 +16,17 @@ export class AppleIIeBus {
  private readonly lcMain=new Uint8Array(0x4000);
  private readonly lcAux=new Uint8Array(0x4000);
  romLoaded=false; keyboard=0;
+ private readonly keyQueue:number[]=[];
+ readonly keyStats={submitted:0,acknowledged:0};
+ get pendingKeys(){return this.keyQueue.length+(this.keyboard&128?1:0);}
+ private advanceKey(){if(this.keyQueue.length)this.keyboard=this.keyQueue.shift()!|128;else this.keyboard&=127;}
+ private acknowledgeKey(){this.keyStats.acknowledged++;this.advanceKey();}
  text=true;mixed=false;page2=false;hires=false;col80=false;
  store80=false;ramrd=false;ramwrt=false;altzp=false;intcxrom=false;slotc3rom=false;
  lcRead=false;lcWrite=false;lcBank2=true;
  private lcPrewrite=false;
  reset(){
-  this.keyboard=0;this.text=true;this.mixed=false;this.page2=false;this.hires=false;this.col80=false;
+  this.keyboard=0;this.keyQueue.length=0;this.keyStats.submitted=0;this.keyStats.acknowledged=0;this.text=true;this.mixed=false;this.page2=false;this.hires=false;this.col80=false;
   this.store80=this.ramrd=this.ramwrt=this.altzp=this.intcxrom=this.slotc3rom=false;
   this.lcRead=this.lcWrite=false;this.lcBank2=true;this.lcPrewrite=false;
  }
@@ -30,7 +35,11 @@ export class AppleIIeBus {
   this.rom.fill(0);this.romStart=data.length===0x4000?0xc000:0xd000;
   this.rom.set(data,this.romStart-0xc000);this.romLoaded=true;
  }
- key(code:number){this.keyboard=(code&127)|128;}
+ key(code:number){
+  this.keyStats.submitted++;
+  if(this.keyboard&128)this.keyQueue.push(code&127);
+  else this.keyboard=(code&127)|128;
+ }
  private bank(a:number,write:boolean):Uint8Array{
   if(a<0x200)return this.altzp?this.aux:this.ram;
   if(this.store80&&((a>=0x400&&a<0x800)||(this.hires&&a>=0x2000&&a<0x4000)))
@@ -74,7 +83,7 @@ export class AppleIIeBus {
   if(a>=0xc0d0&&a<=0xc0df)return this.disk5.access(a);
   if(a>=0xc0e0&&a<=0xc0ef)return this.disk.access(a);
   if(a===0xc000)return this.keyboard;
-  if(a===0xc010){const v=this.keyboard;this.keyboard&=127;return v;}
+  if(a===0xc010){const v=this.keyboard;this.acknowledgeKey();return v;}
   if(a>=0xc080&&a<=0xc08f){this.languageSwitch(a);return 0;}
   if(a>=0xc050&&a<=0xc057){this.softSwitch(a);return 0;}
   const statuses:Record<number,boolean>={
@@ -106,7 +115,7 @@ export class AppleIIeBus {
   if(a>=0xc0e0&&a<=0xc0ef){this.disk.access(a,v);return;}
   if(a>=0xc080&&a<=0xc08f){this.languageSwitch(a);return;}
   if(a>=0xc050&&a<=0xc057){this.softSwitch(a);return;}
-  if(a===0xc010){this.keyboard&=127;return;}
+  if(a===0xc010){this.acknowledgeKey();return;}
   if(a>=0xc000&&a<=0xc00f){this.setMemorySwitch(a);return;}
   if(a>=0xd000){if(this.lcWrite)this.lcArray()[this.lcOffset(a)]=v;return;}
   if(a>=0xc000)return;
