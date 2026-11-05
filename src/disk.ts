@@ -53,6 +53,24 @@ export class DiskII {
    }
   }
  }
+ readonly cpuReadProbe={total:0,ready:0,waiting:0,highBit:0,zero:0,last:[] as string[],prologues:0,dataPrologues:0};
+ private cpuReadHistory:number[]=[];
+ resetCpuReadProbe(){const p=this.cpuReadProbe;p.total=0;p.ready=0;p.waiting=0;p.highBit=0;p.zero=0;p.last.length=0;p.prologues=0;p.dataPrologues=0;this.cpuReadHistory.length=0;}
+ private observeCpuRead(value:number,ready:boolean){
+  const p=this.cpuReadProbe;p.total++;
+  if(ready)p.ready++;else p.waiting++;
+  if(value&128)p.highBit++;
+  if(value===0)p.zero++;
+  if(ready){
+   const h=this.cpuReadHistory;h.push(value);if(h.length>3)h.shift();
+   if(h.length===3&&h[0]===0xd5&&h[1]===0xaa){
+    if(h[2]===0x96)p.prologues++;
+    if(h[2]===0xad)p.dataPrologues++;
+   }
+   p.last.push(value.toString(16).padStart(2,'0'));
+   if(p.last.length>16)p.last.shift();
+  }
+ }
  private cycleRemainder=0;
  // Disk II nominal byte rate is about one byte per 32 1 MHz CPU cycles.
  tick(cycles:number){
@@ -140,7 +158,9 @@ export class DiskII {
   // Until another byte arrives, bit 7 is clear, allowing the boot ROM's BMI polling loop to wait.
   if(sw===12&&!this.q6&&!this.q7&&value===undefined){
    if(this.dataReady)this.readStats.ready++;else this.readStats.waiting++;
-   const result=this.dataReady?this.latch:this.latch&0x7f;
+   const ready=this.dataReady;
+   const result=ready?this.latch:this.latch&0x7f;
+   this.observeCpuRead(result,ready);
    this.dataReady=false;
    return result;
   }
