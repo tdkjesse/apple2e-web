@@ -24,7 +24,26 @@ const bootTrace:number[]=[];
 let reachedBootSector=false;
 let returnedToFirmware=false;
 let firmwareReturn='';
-function hex16(n:number){return '
+function hex16(n:number){return '$'+n.toString(16).padStart(4,'0');}
+function stop(){running=false;}
+function traceStep(){
+ const before=cpu.pc;
+ if(romMode){
+  bootTrace.push(before);
+  if(bootTrace.length>20)bootTrace.shift();
+  if(before>=0x800&&before<0x900)reachedBootSector=true;
+  if(reachedBootSector&&before>=0xc000&&before<0xc600&&!returnedToFirmware){
+   returnedToFirmware=true;
+   firmwareReturn='from '+hex16(bootTrace.length>1?bootTrace[bootTrace.length-2]:before)+' to '+hex16(before);
+  }
+ }
+ cpu.step();
+}
+function traceDiagnostic(){
+ return ' | boot $0800 '+(reachedBootSector?'YES':'NO')+
+  ' | firmware return '+(returnedToFirmware?firmwareReturn:'NO')+
+  ' | recent PCs '+bootTrace.map(hex16).join(' ')+bootSectorDiagnostic();
+}
 function frame(){
  if(!running)return;
  try {for(let i=0;i<12000&&!cpu.halted;i++)traceStep();draw();if(cpu.halted)running=false;}
