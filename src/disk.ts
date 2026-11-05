@@ -14,11 +14,19 @@ export class DiskII {
   for(const byte of image){hash=Math.imul(hash^byte,16777619)>>>0;}
   return hash.toString(16).padStart(8,'0');
  }
- rewind(drive:number){if(drive!==0&&drive!==1)throw new RangeError('Drive must be 0 or 1');this.positions[drive]=0;this.tracks[drive]=0;this.phasesByDrive[drive]=0;this.coils[drive].fill(false);if(this.drive===drive)this.syncDrive();}
+ rewind(drive:number){if(drive!==0&&drive!==1)throw new RangeError('Drive must be 0 or 1');this.positions[drive]=0;this.cycleRemainder=0;this.latch=0;this.tracks[drive]=0;this.phasesByDrive[drive]=0;this.coils[drive].fill(false);if(this.drive===drive)this.syncDrive();}
 
  private q6=false;
  private q7=false;
  private latch=0;
+ private cycleRemainder=0;
+ // Disk II nominal byte rate is about one byte per 32 1 MHz CPU cycles.
+ tick(cycles:number){
+  if(!this.motor||!this.images[this.drive]||this.q7)return;
+  this.cycleRemainder+=cycles;
+  while(this.cycleRemainder>=32){this.cycleRemainder-=32;this.latch=this.readNibble();}
+ }
+
  readonly bootROM=new Uint8Array(256);
  bootROMLoaded=false;
  loadBootROM(bytes:Uint8Array){if(bytes.length!==256)throw new Error('Disk II slot ROM must be exactly 256 bytes');this.bootROM.set(bytes);this.bootROMLoaded=true;}
@@ -37,7 +45,7 @@ export class DiskII {
  mount(drive:number,data:Uint8Array){
   if(drive!==0&&drive!==1)throw new RangeError('Drive must be 0 or 1');
   if(data.length!==143360)throw new Error('Expected a 140 KiB, 35-track, 16-sector .dsk image');
-  this.images[drive]=new Uint8Array(data);this.nibbleTracks[drive].fill(null);this.positions[drive]=0;this.tracks[drive]=0;this.phasesByDrive[drive]=0;
+  this.images[drive]=new Uint8Array(data);this.nibbleTracks[drive].fill(null);this.positions[drive]=0;this.cycleRemainder=0;this.latch=0;this.tracks[drive]=0;this.phasesByDrive[drive]=0;
   this.coils[drive].fill(false);if(drive===this.drive)this.syncDrive();
  }
  private syncDrive(){this.image=this.images[this.drive];this.track=this.tracks[this.drive];this.phase=this.phasesByDrive[this.drive];}
@@ -68,16 +76,15 @@ export class DiskII {
    }
    this.coils[this.drive][phase]=on;
    this.tracks[this.drive]=this.track;this.phasesByDrive[this.drive]=this.phase;
-  }else if(sw===8)this.motor=false;
-  else if(sw===9)this.motor=true;
+  }else if(sw===8){this.motor=false;this.cycleRemainder=0;this.latch=0;}
+  else if(sw===9){if(!this.motor){this.cycleRemainder=0;this.latch=0;}this.motor=true;}
   else if(sw===10){this.drive=0;this.syncDrive();}
   else if(sw===11){this.drive=1;this.syncDrive();}
   else if(sw===12)this.q6=false;
   else if(sw===13)this.q6=true;
   else if(sw===14){this.q7=false;this.writeMode=false;}
   else if(sw===15){this.q7=true;this.writeMode=true;}
-  // Read-only byte-latch approximation. Cycle-accurate shift timing and writes remain future work.
-  if(!this.q6&&!this.q7&&value===undefined&&sw===12)this.latch=this.readNibble();
+  // The latch is advanced by CPU cycles, not by software polling C0EC.
   return this.latch;
  }
 }
