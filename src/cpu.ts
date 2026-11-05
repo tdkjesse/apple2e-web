@@ -34,6 +34,7 @@ define('JMP',['abs','ind'],[0x4c,0x6c],[3,5]);
 
 export class CPU6502 {
  readonly memory = new Uint8Array(65536);
+ bus?: {read(address:number):number;write(address:number,value:number):void};
  a=0; x=0; y=0; pc=0; sp=0xfd; status=0x24; halted=false; cycles=0;
  demoStopOnBrk=false; // Only for the temporary browser demo; not authentic hardware.
  private irqPending=false; private nmiPending=false;
@@ -42,8 +43,8 @@ export class CPU6502 {
    this.irqPending=this.nmiPending=false;
    this.pc=pc ?? this.read16(0xfffc);
  }
- private read(addr:number){return this.memory[addr&0xffff];}
- private write(addr:number,value:number){this.memory[addr&0xffff]=value&255;}
+ private read(addr:number){return this.bus?this.bus.read(addr&0xffff):this.memory[addr&0xffff];}
+ private write(addr:number,value:number){if(this.bus)this.bus.write(addr&0xffff,value&255);else this.memory[addr&0xffff]=value&255;}
  private read16(addr:number){return this.read(addr)|(this.read(addr+1)<<8);}
  private fetch(){const v=this.read(this.pc);this.pc=(this.pc+1)&65535;return v;}
  private word(){const lo=this.fetch();return lo|(this.fetch()<<8);}
@@ -136,7 +137,7 @@ export class CPU6502 {
      }
      case 'INC':case 'DEC':{const n=(v()+(op.name==='INC'?1:-1))&255;this.write(addr,n);this.zn(n);break;}
      case 'JMP':this.pc=addr;break;
-     case 'JSR':{const target=this.word();const ret=(this.pc-1)&65535;this.push(ret>>8);this.push(ret&255);this.pc=target;break;}
+     case 'JSR':{const target=addr;const ret=(this.pc-1)&65535;this.push(ret>>8);this.push(ret&255);this.pc=target;break;}
      case 'RTS':this.pc=((this.pop()|(this.pop()<<8))+1)&65535;break;
      case 'BRK':if(this.demoStopOnBrk){this.halted=true;break;}this.pc=(this.pc+1)&65535;this.interrupt(0xfffe,true);this.cycles-=7;break;
      case 'RTI':this.status=(this.pop()|0x20)&~0x10;this.pc=this.pop()|(this.pop()<<8);break;
