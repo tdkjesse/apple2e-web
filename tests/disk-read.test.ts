@@ -17,10 +17,10 @@ describe('Disk II ROM and nibble read integration',()=>{
   d.tick(1);expect(d.access(0xc0ec)).toBe(0xff);
   expect(d.access(0xc0ec)).toBe(0x7f);
  });
- it('advances one nibble per 32 CPU cycles and clears the ready bit after a poll',()=>{
+ it('advances sync bytes with extended timing and clears the ready bit after a poll',()=>{
   const d=new DiskII();d.mount(0,new Uint8Array(143360));d.access(0xc0e9);
-  d.tick(32*16);expect(d.access(0xc0ec)).toBe(0xff);
-  d.tick(32);expect(d.access(0xc0ec)).toBe(0xd5);
+  d.tick(32+40*15);expect(d.access(0xc0ec)).toBe(0xff);
+  d.tick(40);expect(d.access(0xc0ec)).toBe(0xd5);
   expect(d.access(0xc0ec)).toBe(0x55);
   d.access(0xc0e8);d.tick(320);expect(d.access(0xc0ec)).toBe(0);
  });
