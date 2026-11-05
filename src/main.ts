@@ -51,9 +51,24 @@ let returnedToFirmware=false;
 let firmwareReturn='';
 function hex16(n:number){return '$'+n.toString(16).padStart(4,'0');}
 function stop(){running=false;sectorScanCache='';}
+const loaderBranches=new Map<number,{taken:number;notTaken:number;target:number}>();
+const loaderExits=new Map<string,number>();
+const loaderRecent:string[]=[];
+function loaderBranchDiagnostic(){
+ const branches=[...loaderBranches.entries()].sort((a,b)=>(b[1].taken+b[1].notTaken)-(a[1].taken+a[1].notTaken)).slice(0,12);
+ const exits=[...loaderExits.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8);
+ return ' | loader branches '+branches.map(([pc,v])=>hex16(pc)+'>'+hex16(v.target)+':'+v.taken+'/'+v.notTaken).join(',')+
+  ' | exits '+exits.map(([k,n])=>k+':'+n).join(',')+
+  ' | ZP46/47 '+bus.ram[0x46]+'/'+bus.ram[0x47]+
+  ' | loader recent ['+loaderRecent.join(',')+']';
+}
 function traceStep(){
  if(!running)sectorScanCache='';
  const before=cpu.pc;
+ const traceLoader=romMode&&before>=0xba00&&before<0xbe00;
+ const opcode=traceLoader?bus.ram[before]:0;
+ const branch=traceLoader&&[0x10,0x30,0x50,0x70,0x90,0xb0,0xd0,0xf0].includes(opcode);
+ const target=branch?(before+2+((bus.ram[(before+1)&65535]<<24)>>24))&65535:0;
  if(romMode){
   pcVisits[before]++;instructionCount++;
   bootTrace.push(before);
@@ -65,6 +80,17 @@ function traceStep(){
   }
  }
  cpu.step();
+ if(traceLoader){
+  if(branch){
+   let record=loaderBranches.get(before);
+   if(!record){record={taken:0,notTaken:0,target};loaderBranches.set(before,record);}
+   if(cpu.pc===target)record.taken++;else record.notTaken++;
+   if(cpu.pc===target&&target<0xba00||cpu.pc===target&&target>=0xbe00){loaderRecent.push(hex16(before)+'>'+hex16(target));if(loaderRecent.length>12)loaderRecent.shift();}
+  }
+  if(cpu.pc<0xba00||cpu.pc>=0xbe00){
+   const key=hex16(before)+'>'+hex16(cpu.pc);loaderExits.set(key,(loaderExits.get(key)||0)+1);
+  }
+ }
 }
 function cpuContext(){
  const pc=cpu.pc;
@@ -155,7 +181,7 @@ function textPageDiagnostic(){
 function traceDiagnostic(){
  return ' | boot $0800 '+(reachedBootSector?'YES':'NO')+
   ' | firmware return '+(returnedToFirmware?firmwareReturn:'NO')+
-  ' | recent PCs '+bootTrace.map(hex16).join(' ')+cpuContext()+diskReadDiagnostic()+loaderDiagnostic()+cpuDiskDiagnostic()+sectorHeaderDiagnostic()+bootSectorDiagnostic()+sectorScanDiagnostic()+textPageDiagnostic();
+  ' | recent PCs '+bootTrace.map(hex16).join(' ')+cpuContext()+diskReadDiagnostic()+loaderDiagnostic()+loaderBranchDiagnostic()+cpuDiskDiagnostic()+sectorHeaderDiagnostic()+bootSectorDiagnostic()+sectorScanDiagnostic()+textPageDiagnostic();
 }
 function frame(){
  if(!running)return;
