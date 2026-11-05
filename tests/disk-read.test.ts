@@ -31,6 +31,16 @@ describe('Disk II ROM and nibble read integration',()=>{
   d.access(0xc0e9);d.readNibble();d.access(0xc0e3);
   d.rewind(0);expect(d.track).toBe(0);expect(d.readNibble()).toBe(0xff);
  });
+ it('reads raw NIB track bytes without re-encoding',()=>{
+  const d=new DiskII(),nib=new Uint8Array(232960);nib[0]=0xd5;nib[1]=0xaa;nib[6656]=0x96;
+  d.mount(0,nib);expect(d.formats[0]).toBe('NIB');
+  d.access(0xc0e9);d.tick(32);expect(d.access(0xc0ec)).toBe(0xd5);
+  d.tick(32);expect(d.access(0xc0ec)).toBe(0xaa);
+  expect(()=>d.sector(0,0)).toThrow();
+ });
+ it('rejects invalid NIB lengths',()=>{
+  const d=new DiskII();expect(()=>d.mount(0,new Uint8Array(232959))).toThrow();
+ });
  it('validates boot ROM size and maps slots independently',()=>{
   const b=new AppleIIeBus();
   expect(()=>b.disk.loadBootROM(new Uint8Array(255))).toThrow();
