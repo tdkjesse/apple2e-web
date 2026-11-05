@@ -4,6 +4,8 @@ export class AppleIIeBus {
  readonly disk=new DiskII();
  readonly disk5=new DiskII();
  readonly diskControllers:Record<number,DiskII>={5:this.disk5,6:this.disk};
+ tick(cycles:number){this.disk.tick(cycles);this.disk5.tick(cycles);}
+
  readonly ram=new Uint8Array(65536);
  readonly aux=new Uint8Array(65536);
  readonly rom=new Uint8Array(0x4000);
