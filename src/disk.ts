@@ -7,6 +7,15 @@ export class DiskII {
  readonly images:(Uint8Array|null)[]=[null,null];
  private readonly nibbleTracks:[(Uint8Array|null)[],(Uint8Array|null)[]]=[Array(35).fill(null),Array(35).fill(null)];
  private readonly positions=[0,0];
+ // Fingerprint the actual mounted sector bytes, not the file name or generated GCR stream.
+ fingerprint(drive:number):string{
+  const image=this.images[drive];if(!image)return 'none';
+  let hash=2166136261;
+  for(const byte of image){hash=Math.imul(hash^byte,16777619)>>>0;}
+  return hash.toString(16).padStart(8,'0');
+ }
+ rewind(drive:number){if(drive!==0&&drive!==1)throw new RangeError('Drive must be 0 or 1');this.positions[drive]=0;this.tracks[drive]=0;this.phasesByDrive[drive]=0;this.coils[drive].fill(false);if(this.drive===drive)this.syncDrive();}
+
  private q6=false;
  private q7=false;
  private latch=0;
