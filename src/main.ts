@@ -16,7 +16,9 @@ function frame(){
  catch(e){
   const pc=(cpu.pc-1)&0xffff;
   const bytes=Array.from({length:16},(_,i)=>bus.read((pc-8+i)&0xffff).toString(16).padStart(2,'0')).join(' ');
-  lastError=String(e)+' | At 
+  lastError=String(e)+' | At $'+pc.toString(16).padStart(4,'0')+' nearby: '+bytes+' | S6 track '+bus.disk.track+' motor '+(bus.disk.motor?'on':'off');
+  running=false;draw();
+ }
  if(running)requestAnimationFrame(frame);
 }
 function loadDemo(){
