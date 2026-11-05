@@ -31,8 +31,9 @@ let reachedBootSector=false;
 let returnedToFirmware=false;
 let firmwareReturn='';
 function hex16(n:number){return '$'+n.toString(16).padStart(4,'0');}
-function stop(){running=false;}
+function stop(){running=false;sectorScanCache='';}
 function traceStep(){
+ if(!running)sectorScanCache='';
  const before=cpu.pc;
  if(romMode){
   pcVisits[before]++;instructionCount++;
@@ -66,10 +67,39 @@ function loaderDiagnostic(){
   ' | video writes text '+v.text+' hires '+v.hires+' last '+hex16(v.last)+
   ' | display '+(bus.text?'TEXT':'GRAPHICS')+' page '+(bus.page2?2:1)+' hires '+(bus.hires?'YES':'NO');
 }
+let sectorScanCache='';
+function sectorScanDiagnostic(){
+ if(running)return ' | later-sector scan: pause to inspect';
+ if(sectorScanCache)return sectorScanCache;
+ const image=bus.disk.images[0];
+ if(bus.disk.formats[0]!=='DSK'||!image)return '';
+ // Inspect RAM pages against the first three tracks; skip uniform sectors.
+ // This is a similarity check, NOT proof that a sector was successfully decoded.
+ const best:{score:number;address:number;track:number;sector:number}[]=[];
+ let exact=0;
+ for(let sectorIndex=1;sectorIndex<48;sectorIndex++){
+  const start=sectorIndex*256;
+  let varied=false;
+  for(let j=1;j<256;j++)if(image[start+j]!==image[start]){varied=true;break;}
+  if(!varied)continue;
+  let topScore=0,topAddress=0;
+  for(let address=0x900;address<0x8000;address+=256){
+   let score=0;
+   for(let j=0;j<256;j++)if(bus.ram[address+j]===image[start+j])score++;
+   if(score>topScore){topScore=score;topAddress=address;}
+  }
+  if(topScore===256)exact++;
+  best.push({score:topScore,address:topAddress,track:Math.floor(sectorIndex/16),sector:sectorIndex%16});
+ }
+ best.sort((a,b)=>b.score-a.score);
+ sectorScanCache=' | later-sector scan T0-2 exact '+exact+
+  ' | closest '+best.slice(0,5).map(x=>'T'+x.track+'S'+x.sector+'@'+hex16(x.address)+':'+x.score+'/256').join(',');
+ return sectorScanCache;
+}
 function traceDiagnostic(){
  return ' | boot $0800 '+(reachedBootSector?'YES':'NO')+
   ' | firmware return '+(returnedToFirmware?firmwareReturn:'NO')+
-  ' | recent PCs '+bootTrace.map(hex16).join(' ')+cpuContext()+diskReadDiagnostic()+loaderDiagnostic()+bootSectorDiagnostic();
+  ' | recent PCs '+bootTrace.map(hex16).join(' ')+cpuContext()+diskReadDiagnostic()+loaderDiagnostic()+bootSectorDiagnostic()+sectorScanDiagnostic();
 }
 function frame(){
  if(!running)return;
@@ -116,7 +146,7 @@ function draw(){
 }
 document.querySelector('#reset')!.addEventListener('click',()=>{stop();lastError='';if(romMode){bus.reset();cpu.reset();draw();}else loadDemo();});
 document.querySelector('#boot-disk')!.addEventListener('click',()=>{
- stop();lastError='';bus.disk.resetReadStats();bus.disk.resetHeadStats();bus.resetVideoWrites();pcVisits.fill(0);instructionCount=0;bootTrace.length=0;reachedBootSector=false;returnedToFirmware=false;firmwareReturn='';
+ stop();lastError='';sectorScanCache='';bus.disk.resetReadStats();bus.disk.resetHeadStats();bus.resetVideoWrites();pcVisits.fill(0);instructionCount=0;bootTrace.length=0;reachedBootSector=false;returnedToFirmware=false;firmwareReturn='';
  if(!bus.romLoaded){lastError='Load the Apple IIe system ROM first';draw();return;}
  if(!bus.disk.bootROMLoaded){lastError='Load the 256-byte slot 6 Disk II boot ROM first';draw();return;}
  if(!bus.disk.images[0]){lastError='Mount a disk in Slot 6 Drive 1 first';draw();return;}
