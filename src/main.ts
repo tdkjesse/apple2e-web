@@ -66,7 +66,8 @@ function loaderDiagnostic(){
   ' | hot PCs '+hot.slice(0,5).map(a=>hex16(a)+':'+pcVisits[a]).join(',')+
   ' | head moves '+h.transitions+' ['+h.history.join(',')+']'+
   ' | video writes text '+v.text+' hires '+v.hires+' last '+hex16(v.last)+
-  ' | display '+(bus.text?'TEXT':'GRAPHICS')+' page '+(bus.page2?2:1)+' hires '+(bus.hires?'YES':'NO');
+  ' | display '+(bus.text?'TEXT':'GRAPHICS')+' page '+(bus.page2?2:1)+' hires '+(bus.hires?'YES':'NO')+
+  ' | keyboard sent '+bus.keyStats.submitted+' ack '+bus.keyStats.acknowledged+' pending '+bus.pendingKeys;
 }
 let sectorScanCache='';
 function sectorScanDiagnostic(){
