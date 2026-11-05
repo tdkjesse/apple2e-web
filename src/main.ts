@@ -75,6 +75,13 @@ function diskReadDiagnostic(){
  const d=bus.disk.readStats;
  return ' | Disk reads ready '+d.ready+' wait '+d.waiting+' overwritten '+d.overwritten+' produced '+d.produced;
 }
+function sectorHeaderDiagnostic(){
+ const p=bus.disk.sectorProbe;
+ return ' | sector probe T'+p.track+' headers '+p.addresses+' data '+p.dataMarks+
+  ' bad checksum '+p.invalidChecksums+' last S'+p.lastSector+
+  ' counts '+p.sectorCounts.map((n,i)=>i+':'+n).join(',')+
+  ' recent ['+p.recent.join(',')+']';
+}
 function loaderDiagnostic(){
  const hot:number[]=[];
  for(let a=0x800;a<0xc000;a++)if(pcVisits[a]>0)hot.push(a);
@@ -141,7 +148,7 @@ function textPageDiagnostic(){
 function traceDiagnostic(){
  return ' | boot $0800 '+(reachedBootSector?'YES':'NO')+
   ' | firmware return '+(returnedToFirmware?firmwareReturn:'NO')+
-  ' | recent PCs '+bootTrace.map(hex16).join(' ')+cpuContext()+diskReadDiagnostic()+loaderDiagnostic()+bootSectorDiagnostic()+sectorScanDiagnostic()+textPageDiagnostic();
+  ' | recent PCs '+bootTrace.map(hex16).join(' ')+cpuContext()+diskReadDiagnostic()+loaderDiagnostic()+sectorHeaderDiagnostic()+bootSectorDiagnostic()+sectorScanDiagnostic()+textPageDiagnostic();
 }
 function frame(){
  if(!running)return;
@@ -188,7 +195,7 @@ function draw(){
 }
 document.querySelector('#reset')!.addEventListener('click',()=>{stop();lastError='';if(romMode){bus.reset();cpu.reset();draw();}else loadDemo();});
 document.querySelector('#boot-disk')!.addEventListener('click',()=>{
- stop();lastError='';sectorScanCache='';bus.disk.resetReadStats();bus.disk.resetHeadStats();bus.resetVideoWrites();pcVisits.fill(0);instructionCount=0;bootTrace.length=0;reachedBootSector=false;returnedToFirmware=false;firmwareReturn='';
+ stop();lastError='';sectorScanCache='';bus.disk.resetReadStats();bus.disk.resetHeadStats();bus.disk.resetSectorProbe();bus.resetVideoWrites();pcVisits.fill(0);instructionCount=0;bootTrace.length=0;reachedBootSector=false;returnedToFirmware=false;firmwareReturn='';
  if(!bus.romLoaded){lastError='Load the Apple IIe system ROM first';draw();return;}
  if(!bus.disk.bootROMLoaded){lastError='Load the 256-byte slot 6 Disk II boot ROM first';draw();return;}
  if(!bus.disk.images[0]){lastError='Mount a disk in Slot 6 Drive 1 first';draw();return;}
